@@ -1,7 +1,6 @@
 import type { AppInfo, EagleAdapter, FolderInfo, ItemFile, ItemInfo, LibrarySummary } from './adapter';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const ITEM_FIELDS = ['id', 'name', 'ext', 'size', 'folders', 'tags', 'importedAt', 'modifiedAt'];
 
 function api(): any {
   if (typeof eagle === 'undefined' || !eagle) throw new Error('eagle 全局对象不存在');
@@ -67,9 +66,9 @@ export class RealEagleAdapter implements EagleAdapter {
 
   async getItems(folderId: string | null): Promise<ItemInfo[]> {
     const e = api();
-    const query = async (q: Record<string, unknown>): Promise<any[]> => {
-      try { return await e.item.get({ ...q, fields: ITEM_FIELDS }); } catch { return e.item.get(q); }
-    };
+    // 实测：带 fields 时 importedAt / modifiedAt 会变成 0，ETag 与排序都依赖它们，所以不用 fields。
+    // 大库性能留待 M4（可改为 getIdsWithModifiedAt 补时间戳）。
+    const query = (q: Record<string, unknown>): Promise<any[]> => e.item.get(q);
     if (folderId !== null) {
       return (await query({ folders: [folderId] })).map(toItem);
     }
@@ -91,8 +90,11 @@ export class RealEagleAdapter implements EagleAdapter {
     const flat = await this.getFolders();
     lines.push(`folder.getAll 返回 ${raw.length} 项，展开后 ${flat.length} 个文件夹，顶层 ${flat.filter((f) => f.parentId === null).length} 个`);
     if (raw[0]) lines.push('Folder 成员：' + members(raw[0]));
-    const sample = (await api().item.get({ fields: ITEM_FIELDS, limit: 1 }).catch(() => []))[0];
-    if (sample) lines.push('Item 成员：' + members(sample) + ' | 示例 ' + JSON.stringify(toItem(sample)));
+    const sample = (await api().item.get({ limit: 1 }).catch(() => []))[0];
+    if (sample) {
+      lines.push('Item 成员：' + members(sample));
+      lines.push('item.get 示例：' + JSON.stringify(toItem(sample)));
+    }
     return lines;
   }
 

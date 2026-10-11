@@ -44,7 +44,7 @@ PUT 先写影子暂存区，`addFromPath` 加 20s 超时；超时返回 `415` �
 ## 里程碑
 - M0 探针：已完成（`probe/`），遗留项见下
 - M1 骨架：已完成并真机验证（Eagle 内启动、OPTIONS、Basic 认证、局域网访问均正常）。已有：配置与 scrypt 密码、源地址过滤、Basic 认证与封禁、OPTIONS、资源库切换 503、状态窗口、EagleAdapter 接口与 Fake
-- M2 只读：代码、单元测试、rclone 对假数据服务（`npx tsx test/dev/fake-server.ts`）均已通过；待在真实 Eagle 里重载插件验证，并用 Finder 挂载验证（命令行 `mount_webdav` 在锁屏时返回 22，需要解锁的桌面会话）。已有：PROPFIND（Depth 0/1，流式输出）、GET/HEAD（Range、条件请求、库内路径校验）、假 LOCK/UNLOCK（Finder 读取也要锁）、目录名消歧、索引缓存（按 `library.info().modificationTime` 失效）。**未做**：`@标签` 视图（需先确认标签列表 API）
+- M2 只读：已完成并真机验证（Production 库 47 个条目：rclone lsd/ls/copy/check 全部一致，Finder 同款挂载 ls/cp/cmp 正常，列目录约 0.6s，拷贝 0.05s）。**未做**：`@标签` 视图（需先确认标签列表 API）；Finder 手动操作写入留到 M3
 - M3 写入：PUT、MKCOL、DELETE、MOVE、COPY、PROPPATCH、LOCK/UNLOCK
 - M4 变更监听、性能、大库测试
 
@@ -58,6 +58,7 @@ NFC/NFD 文件名、`replaceFile` 换扩展名、跨设备 LAN、完整 R2（关
 - 在真机验证前，不要假设 Eagle API 存在某方法；先查本文件的实测事实
 - 构建与测试：`npm run build`、`npm run typecheck`、`npm test`（tsx + node:test，`test/unit/`）
 - 脚本加载瞬间 `eagle.app` 的 version、build、userDataPath 读不到（曾显示 Build 0），初始化要等 `onPluginCreate`，build 读不到时不拦截启动
-- M2 对 Eagle 形态的假设（真机未核对，启动日志里有「形态自检」输出可对照）：`folder.getAll()` 可能是扁平也可能是树，适配层两种都兼容；Folder 的 `createdAt` 字段名未确认（回退 `modificationTime`，再回退 0）；`item.get({folders:[id]})` 视为只返回直属条目；未分类 = 取全库再过滤 `folders.length === 0`（大库慢，需 M4 优化）；`item.get` 的 `fields` 参数含 importedAt 未确认，失败时自动退回不带 fields
+- 真机核对结果（Eagle 4.0.0 Build 23）：`eagle.app.userDataPath` 存在（`~/Library/Application Support/Eagle`，配置放其下 `eagle-webdav/`），但要等 `onPluginCreate`；`folder.getAll()` 返回的元素带 `children`，Folder 成员有 `createdAt`、`parent`、`children`、`description`、`icon`、`iconColor`；Item 成员还有 `palettes`、`comments`、`metadataFilePath`、`noThumbnail`、`noPreview`；**`item.get` 带 `fields` 时 `importedAt` / `modifiedAt` 会变成 0**（`getById` 与不带 fields 的 `get` 才是真值，毫秒时间戳），所以列表不用 fields；`item.get({folders:[id]})` 按直属条目工作正常；未分类 = 取全库再过滤（大库慢，M4 优化）
+- 联调：不依赖 Eagle 用 `npx tsx test/dev/fake-server.ts` 起假数据服务；命令行 `mount_webdav` 带 URL 凭据会返回 22，改用 `osascript -e 'mount volume "http://127.0.0.1:41600/" as user name "eagle" with password "..."'`（走 NetFS，与 Finder 一致）；重载插件页面可在其 DevTools 控制台执行 `location.reload()`（屏幕锁定时 GUI 操作不可用）
 - 源码：`src/{config,http,eagle,util,ui}`；只有 `src/eagle/realAdapter.ts` 可直接碰全局 `eagle`；`eagle.app.userDataPath` 未实测，缺失时回退到 `~/.eagle-webdav`
 - 探针测试：`node probe/test/selftest.js`；与 rclone 对照：`probe/test/compare.sh`

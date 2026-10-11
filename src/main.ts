@@ -149,6 +149,12 @@ function registerLifecycle(): void {
   });
 }
 
+// 页面被重载或关闭时，立刻放开子进程（dns-sd、caffeinate）
+window.addEventListener('pagehide', () => {
+  bonjour.stop();
+  sleepGuard.release();
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   registerLifecycle();
   // 优先等 onPluginCreate，此时 eagle.app 已就绪；取不到事件则兜底延迟初始化

@@ -35,7 +35,8 @@ export class SleepGuard {
     if (this.child || !this.supported || !this.opts.enabled()) return;
     const spawnFn: Spawn = this.opts.spawnFn ?? ((c, a) => spawn(c, a, { stdio: 'ignore' }));
     try {
-      const child = spawnFn('caffeinate', ['-i']);
+      // -w：被监视的进程（Eagle 的渲染进程）退出时 caffeinate 自己也退出，避免遗留
+      const child = spawnFn('caffeinate', ['-i', '-w', String(process.pid)]);
       child.on('exit', () => { if (this.child === child) this.child = null; });
       child.on('error', () => { if (this.child === child) this.child = null; });
       this.child = child;

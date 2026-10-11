@@ -52,12 +52,13 @@ export async function importAt(ctx: DavContext, file: string, name: string, fold
     const id = await ctx.adapter.importFile(file, { name: base, folders: folderId === null ? [] : [folderId] });
     ctx.index.invalidate();
     // 实测：内容与库内已有文件相同时 Eagle 立即返回 id，但会弹「重复添加提示」，等人确认后才真正入库
+    // 以「目录列表里能否看到它」为准：弹重复提示时 getById 已经能返回条目，不能用它判断
     let landed = false;
-    for (let i = 0; i < 5 && !landed; i++) {
-      landed = (await ctx.adapter.getItemFile(id).catch(() => null)) !== null;
+    for (let i = 0; i < 3 && !landed; i++) {
+      landed = await isListed(ctx, id, folderId);
       if (!landed) await new Promise((r) => setTimeout(r, 300));
     }
-    if (!landed) watchPending(ctx, id, name);
+    if (!landed) watchPending(ctx, id, name, folderId);
     return { ok: true, id };
   } catch (e) {
     if (e instanceof ImportTimeoutError) return { ok: false, status: 415, message: 'Eagle 无法识别该文件格式（导入超时）' };
@@ -66,25 +67,35 @@ export async function importAt(ctx: DavContext, file: string, name: string, fold
   }
 }
 
-const PENDING_POLL_MS = 4_000;
+const PENDING_POLL_MS = 5_000;
 const PENDING_GIVE_UP_MS = 10 * 60_000;
 
 /**
  * 导入后条目迟迟没有出现：多半是 Eagle 弹出了「重复添加提示」在等人确认。
  * 给用户一条可见的提示，并在后台轮询，条目一出现（或 10 分钟后）就撤销提示。
  */
-export function watchPending(ctx: DavContext, id: string, name: string, pollMs = PENDING_POLL_MS, giveUpMs = PENDING_GIVE_UP_MS): void {
+async function isListed(ctx: DavContext, id: string, folderId: string | null): Promise<boolean> {
+  try {
+    return (await ctx.adapter.getItems(folderId)).some((i) => i.id === id);
+  } catch {
+    return false;
+  }
+}
+
+export function watchPending(
+  ctx: DavContext, id: string, name: string, folderId: string | null, pollMs = PENDING_POLL_MS, giveUpMs = PENDING_GIVE_UP_MS
+): void {
   const key = 'pending:' + id;
   ctx.logger.notice(key, `「${name}」还没有入库：Eagle 可能弹出了「重复添加提示」，请到 Eagle 里点一下确认`);
   const started = Date.now();
   const timer = setInterval(() => {
-    void ctx.adapter.getItemFile(id).then((it) => {
-      if (it || Date.now() - started > giveUpMs) {
+    void isListed(ctx, id, folderId).then((listed) => {
+      if (listed || Date.now() - started > giveUpMs) {
         clearInterval(timer);
         ctx.logger.clearNotice(key);
-        if (it) ctx.index.invalidate();
+        if (listed) ctx.index.invalidate();
       }
-    }, () => undefined);
+    });
   }, pollMs);
   timer.unref?.();
 }

@@ -100,14 +100,16 @@ function fakeChild(): { child: FakeChild } {
 
 test('防休眠：请求期间保持 caffeinate，空闲后放开，可关闭', async () => {
   const spawned: Array<ReturnType<typeof fakeChild>['child']> = [];
+  let argv: string[] = [];
   let enabled = true;
   const g = new SleepGuard({
     enabled: () => enabled, idleMs: 30, platform: 'darwin',
-    spawnFn: ((cmd: string, args: string[]) => { assert.strictEqual(cmd, 'caffeinate'); assert.deepStrictEqual(args, ['-i']); const c = fakeChild().child; spawned.push(c); return c; }) as never
+    spawnFn: ((cmd: string, args: string[]) => { assert.strictEqual(cmd, 'caffeinate'); argv = args; const c = fakeChild().child; spawned.push(c); return c; }) as never
   });
   g.begin(); g.begin();
   assert.ok(g.active);
   assert.strictEqual(spawned.length, 1, '只起一个进程');
+  assert.ok(argv.includes('-w'), 'caffeinate 绑定到当前进程，避免遗留');
   g.end();
   await new Promise((r) => setTimeout(r, 60));
   assert.ok(g.active, '还有一个请求在处理，不放开');
@@ -165,11 +167,11 @@ test('重复添加提示：给出提示，条目入库后自动撤销', async ()
   const notified: string[] = [];
   logger.onNotice = (n) => notified.push(n.message);
   const ctx = { adapter: fake, index: new LibraryIndex(fake), logger } as unknown as DavContext;
-  watchPending(ctx, 'LATER000001', '海报.jpg', 20, 5000);
+  watchPending(ctx, 'LATER000001', '海报.jpg', null, 20, 5000);
   assert.strictEqual(logger.activeNotices().length, 1);
   assert.strictEqual(notified.length, 1);
   assert.match(notified[0], /重复添加提示/);
-  watchPending(ctx, 'LATER000001', '海报.jpg', 20, 5000); // 同一个 key 不重复通知
+  watchPending(ctx, 'LATER000001', '海报.jpg', null, 20, 5000); // 同一个 key 不重复通知
   assert.strictEqual(notified.length, 1);
   await new Promise((r) => setTimeout(r, 60));
   assert.strictEqual(logger.activeNotices().length, 1, '条目还没入库，提示保留');

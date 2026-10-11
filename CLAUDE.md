@@ -52,6 +52,13 @@ PUT 先写影子暂存区，`addFromPath` 加 20s 超时；超时返回 `415` �
   - 未分类改用 `item.get({isUnfiled:true})`（实测正确；`folders:[]` 等于不过滤）。
   - 缓存：目录列表建了名字/冲突键索引，条目缓存总量 LRU 上限 20 万条。压测（`npx tsx test/dev/bench.ts`，假数据 20 万条）：2 万条目录 Depth:1 约 0.1s、15MB，堆 +20MB；真实瓶颈在 Eagle 自身的 `item.get`，真实大库尚未测过（Production 库仅 48 条）
 
+## 体验增强（已真机验证）
+- 状态窗口：连接地址一键复制、二维码（`qrcode-generator`，已用系统识别验证能扫出正确地址）、最近连接的客户端（按 User-Agent 识别 Finder / Infuse / rclone 等）、提示横幅（可「忽略」）。`198.18.0.0/15`（Surge 虚拟网卡）不列入连接地址
+- Bonjour：`dns-sd -R "Eagle WebDAV (主机名)" _webdav._tcp local <端口>`，仅对局域网开放时注册；子进程在页面 `pagehide`、停止、退出时结束，启动时 `pkill -f 'dns-sd -R Eagle WebDAV'` 清理上次遗留
+- 防休眠：有请求时起 `caffeinate -i -w <进程号>`，空闲 60s 结束（`-w` 保证宿主进程退出后它也退出）
+- 只读账号（默认用户名 `viewer`）：写入类方法 403，`OPTIONS` 以 `DAV: 1` 通告（Finder 只读挂载），LOCK 不存在的路径 403
+- 重复添加提示：`importAt` 后按**目录列表**确认条目是否出现（`getById` 在弹提示时就已能返回条目，不能用来判断）；没出现就给横幅并用 `eagle.notification.show` 通知，后台每 5s 轮询，入库后自动撤销，10 分钟放弃。实测 Eagle 把多个重复提示合并处理时可能丢掉后面的导入
+
 ## 仍未验证
 Infuse 与 iPad 实机、Finder 图形界面的拖拽、几十万条的真实大库、litmus 协议合规测试、跨设备 LAN 访问（只在本机经局域网 IP 测过）、NFC/NFD 磁盘文件名归一化（服务端按 NFC 匹配路径，已用 NFD 请求验证）。
 

@@ -12,7 +12,8 @@ export function lanAddresses(): LanAddress[] {
   const ifs = os.networkInterfaces();
   for (const name of Object.keys(ifs)) {
     for (const a of ifs[name] ?? []) {
-      if (a.family === 'IPv4' && !a.internal) out.push({ name, address: a.address });
+      // 198.18.0.0/15 是基准测试保留网段，Surge 等代理软件的虚拟网卡会用到，手机连不上
+      if (a.family === 'IPv4' && !a.internal && !/^198\.1[89]\./.test(a.address)) out.push({ name, address: a.address });
     }
   }
   return out;
@@ -205,7 +206,14 @@ export class StatusView {
     for (const n of this.logger.activeNotices()) {
       const d = document.createElement('div');
       d.className = 'notice';
-      d.textContent = n.message;
+      const msg = document.createElement('span');
+      msg.textContent = n.message;
+      const btn = document.createElement('button');
+      btn.className = 'sec';
+      btn.textContent = '忽略';
+      btn.style.marginLeft = '10px';
+      btn.addEventListener('click', () => { this.logger.clearNotice(n.key); this.renderLog(true); });
+      d.append(msg, btn);
       notices.append(d);
     }
 

@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'child_process';
+import { spawn, spawnSync, type ChildProcess } from 'child_process';
 import * as os from 'os';
 
 type Spawn = (cmd: string, args: string[]) => ChildProcess;
@@ -12,8 +12,15 @@ export class Bonjour {
 
   get active(): boolean { return this.child !== null; }
 
+  /** 清理上一个插件实例（重载页面、异常退出）遗留的 dns-sd 注册进程。 */
+  static killStale(): void {
+    if (process.platform !== 'darwin') return;
+    try { spawnSync('pkill', ['-f', 'dns-sd -R Eagle WebDAV'], { stdio: 'ignore' }); } catch { /* ignore */ }
+  }
+
   start(port: number): boolean {
     this.stop();
+    Bonjour.killStale();
     if ((this.opts.platform ?? process.platform) !== 'darwin') return false;
     const host = (this.opts.hostname ?? os.hostname)().split('.')[0] || 'Mac';
     this.name = `Eagle WebDAV (${host})`;

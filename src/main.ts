@@ -1,9 +1,11 @@
+import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { ConfigStore } from './config/config';
 import { MIN_BUILD, type EagleAdapter } from './eagle/adapter';
 import { RealEagleAdapter, userDataDir } from './eagle/realAdapter';
 import { DavRouter } from './dav/router';
+import { parseCidr } from './http/access';
 import { DavServer } from './http/server';
 import { LibraryIndex } from './index/libraryIndex';
 import { StatusView, lanAddresses } from './ui/status';
@@ -17,6 +19,8 @@ const logger = new RingLogger((level, msg) => {
 let configDir = '';
 let store = new ConfigStore(path.join(os.homedir(), '.eagle-webdav', 'eagle-webdav'));
 const adapter: EagleAdapter = new RealEagleAdapter();
+// 上次异常退出可能遗留的临时文件（PUT 缓冲、影子暂存区）
+try { fs.rmSync(path.join(os.tmpdir(), 'eagle-webdav'), { recursive: true, force: true }); } catch { /* ignore */ }
 const index = new LibraryIndex(adapter);
 const router = new DavRouter(adapter, index, logger, { tagsView: () => store.get().tagsView });
 const server = new DavServer({ getConfig: () => store.get(), logger, handler: (req, res) => router.handle(req, res) });
@@ -77,11 +81,11 @@ function init(): void {
   view.bind({
     onStart(form) {
       if (form.password) store.setPassword(form.password);
-      store.update({ host: form.host, port: form.port, username: form.username });
+      store.update({ host: form.host, port: form.port, username: form.username, extraAllowedCidrs: form.cidrs.filter((c) => parseCidr(c) !== null) });
       void start();
     },
     onStop() { void stop(); }
-  }, { host: cfg.host, port: cfg.port, username: cfg.username, hasPassword: !!cfg.passwordHash });
+  }, { host: cfg.host, port: cfg.port, username: cfg.username, hasPassword: !!cfg.passwordHash, cidrs: cfg.extraAllowedCidrs });
   view.setStatus('已停止');
   view.renderLog(true);
 
@@ -105,7 +109,7 @@ function registerLifecycle(): void {
       server.setSwitching(false);
     }
   });
-  eagle.onPluginBeforeExit?.(() => { void server.stop(); });
+  eagle.onPluginBeforeExit?.(() => { void server.stop().then(() => router.dispose()); });
 }
 
 document.addEventListener('DOMContentLoaded', () => {

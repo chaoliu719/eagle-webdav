@@ -6,7 +6,9 @@ import { send } from '../../http/respond';
 import { buildName, cleanBase } from '../../vfs/naming';
 import { isSystemName } from '../../vfs/shadow';
 import { isCollection, isTagsView, pathKey, type Resolved } from '../../vfs/resolver';
+import { writePreconditionFailed } from '../conditional';
 import type { DavContext } from '../context';
+import { etagOf } from '../props';
 import { safeLibraryFile } from '../safeFile';
 import { parseRequestPath } from '../path';
 import { folderIdOf, importAt, unusableItemName, makeTmpDir, parentSegsOf, removeDir, splitExt } from './common';
@@ -43,6 +45,7 @@ export async function handleTransfer(
   req.resume();
   const src = await ctx.resolver.resolve(srcSegs);
   if (!src) return send(res, 404, {}, 'Not Found');
+  if (isMove && src.kind === 'item' && writePreconditionFailed(req.headers, etagOf(ctx.index.normalize(src.item)))) return send(res, 412, {}, 'Precondition Failed');
   const destSegs = parseDestination(req);
   if (destSegs === 'bad') return send(res, 400, {}, '缺少或无效的 Destination');
   if (destSegs === 'foreign') return send(res, 502, {}, '目标不在本服务');

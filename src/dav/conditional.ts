@@ -72,3 +72,19 @@ export function parseRange(header: string | undefined, size: number): RangeResul
   if (size === 0 || start >= size) return { kind: 'unsatisfiable' };
   return { kind: 'range', start, end };
 }
+
+/**
+ * 写入类方法（PUT / DELETE / MOVE）的前置条件：
+ * If-Match 与当前 ETag 不符、或目标不存在时给了具体 ETag → 412；
+ * If-None-Match: * 而目标已存在 → 412。etag 为 null 表示目标不存在。
+ */
+export function writePreconditionFailed(h: http.IncomingHttpHeaders, etag: string | null): boolean {
+  const ifMatch = h['if-match'];
+  if (ifMatch !== undefined) {
+    if (etag === null) return true;
+    if (!matches(ifMatch, etag)) return true;
+  }
+  const inm = h['if-none-match'];
+  if (inm !== undefined && etag !== null && matches(inm, etag)) return true;
+  return false;
+}

@@ -6,10 +6,14 @@ import { pipeline } from 'stream/promises';
 import { send } from '../../http/respond';
 import { isSystemName } from '../../vfs/shadow';
 import { isCollection, isTagsView, pathKey } from '../../vfs/resolver';
+import { writePreconditionFailed } from '../conditional';
 import type { DavContext } from '../context';
+import { etagOf } from '../props';
 import { folderIdOf, importAt, makeTmpDir, parentSegsOf, reject, removeDir, splitExt } from './common';
 
 class LimitError extends Error {}
+
+export const IDLE_MS = 120_000;
 
 /** 把请求体落盘到 file，超过 limit 抛 LimitError。 */
 async function writeBody(req: http.IncomingMessage, file: string, limit: number): Promise<number> {
@@ -21,6 +25,8 @@ async function writeBody(req: http.IncomingMessage, file: string, limit: number)
       else cb(null, chunk);
     }
   });
+  // 120 秒没有数据就中止（慢速攻击与卡死的客户端）
+  req.setTimeout(IDLE_MS, () => req.destroy(new Error('上传空闲超时')));
   await pipeline(req, counter, fs.createWriteStream(file));
   return n;
 }
@@ -33,6 +39,9 @@ export async function handlePut(ctx: DavContext, req: http.IncomingMessage, res:
   const target = await ctx.resolver.resolve(segs);
   if (target && isCollection(target)) return reject(req, res, 405, '目标是集合');
   if (isTagsView(parent) || (target && isTagsView(target))) return reject(req, res, 403, '「@标签」视图只读');
+
+  const targetEtag = target?.kind === 'item' ? etagOf(ctx.index.normalize(target.item)) : target ? '"shadow"' : null;
+  if (target?.kind !== 'shadow' && writePreconditionFailed(req.headers, targetEtag)) return reject(req, res, 412, 'Precondition Failed');
 
   const declared = Number(req.headers['content-length'] ?? 0);
   if (declared > ctx.maxPut) return reject(req, res, 413, '文件过大');

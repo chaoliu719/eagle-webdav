@@ -17,7 +17,7 @@ export function lanAddresses(): LanAddress[] {
 }
 
 export interface StatusHandlers {
-  onStart(form: { host: string; port: number; username: string; password: string }): void;
+  onStart(form: { host: string; port: number; username: string; password: string; cidrs: string[] }): void;
   onStop(): void;
 }
 
@@ -28,7 +28,7 @@ export class StatusView {
     logger.onChange(() => this.renderLog(false));
   }
 
-  bind(handlers: StatusHandlers, initial: { host: string; port: number; username: string; hasPassword: boolean }): void {
+  bind(handlers: StatusHandlers, initial: { host: string; port: number; username: string; hasPassword: boolean; cidrs: string[] }): void {
     const sel = $<HTMLSelectElement>('host');
     const options: Array<[string, string]> = [['仅本机（127.0.0.1）', '127.0.0.1']];
     for (const a of lanAddresses()) options.push([`${a.address}（${a.name}）`, a.address]);
@@ -40,6 +40,7 @@ export class StatusView {
 
     $<HTMLInputElement>('port').value = String(initial.port);
     $<HTMLInputElement>('user').value = initial.username;
+    $<HTMLInputElement>('cidrs').value = initial.cidrs.join(', ');
     $<HTMLInputElement>('pass').placeholder = initial.hasPassword ? '已设置，留空保持不变' : '未设置';
     this.updateHostWarning();
 
@@ -47,7 +48,8 @@ export class StatusView {
       host: sel.value,
       port: parseInt($<HTMLInputElement>('port').value, 10) || 41600,
       username: $<HTMLInputElement>('user').value.trim(),
-      password: $<HTMLInputElement>('pass').value
+      password: $<HTMLInputElement>('pass').value,
+      cidrs: $<HTMLInputElement>('cidrs').value.split(/[,\s]+/).map((c) => c.trim()).filter(Boolean)
     }));
     $('btnStop').addEventListener('click', () => handlers.onStop());
   }

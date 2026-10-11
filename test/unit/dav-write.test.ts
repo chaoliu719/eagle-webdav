@@ -266,10 +266,37 @@ test('客户端上传中途断开：不入库，临时文件被清理', async ()
   assert.strictEqual((await req('GET', '/A/aborted.txt')).status, 404);
 });
 
+test('写入前置条件：If-Match / If-None-Match', async () => {
+  fake.addItem('cond', 'txt', 'v1', [A.id]);
+  index.invalidate();
+  const etag = String((await req('GET', '/A/cond.txt')).headers['etag']);
+  assert.strictEqual((await req('PUT', '/A/cond.txt', { 'If-Match': '"nope"' }, 'x')).status, 412);
+  assert.strictEqual((await req('PUT', '/A/cond.txt', { 'If-None-Match': '*' }, 'x')).status, 412);
+  assert.strictEqual((await req('PUT', '/A/cond-new.txt', { 'If-Match': '"x"' }, 'x')).status, 412, '目标不存在时 If-Match 失败');
+  assert.strictEqual((await req('PUT', '/A/cond-new.txt', { 'If-None-Match': '*' }, 'x')).status, 201);
+  assert.strictEqual((await req('DELETE', '/A/cond.txt', { 'If-Match': '"nope"' })).status, 412);
+  assert.strictEqual((await req('MOVE', '/A/cond.txt', { 'If-Match': '"nope"', ...dest('/A/cond2.txt') })).status, 412);
+  assert.strictEqual((await req('PUT', '/A/cond.txt', { 'If-Match': etag }, 'v2')).status, 204);
+  assert.strictEqual((await req('DELETE', '/A/cond.txt', { 'If-Match': '*' })).status, 204);
+});
+
+test('E:width / E:height 属性', async () => {
+  const it = fake.addItem('pic', 'png', 'P', [A.id]);
+  it.width = 640; it.height = 480;
+  index.invalidate();
+  const r = await req('PROPFIND', '/A/pic.png', { Depth: '0' }, '<?xml version="1.0"?><D:propfind xmlns:D="DAV:" xmlns:E="urn:eagle-webdav:ns"><D:prop><E:width/><E:height/><E:id/></D:prop></D:propfind>');
+  assert.ok(r.body.includes('>640<') && r.body.includes('>480<') && r.body.includes(it.id));
+});
+
 test('资源库切换后影子条目被清空', async () => {
   await req('PUT', '/A/.DS_Store', {}, 'junk');
   router.reset();
   assert.strictEqual((await req('GET', '/A/.DS_Store')).status, 404);
+});
+
+test('dispose 清理临时目录', () => {
+  router.dispose();
+  assert.ok(!fs.existsSync(router.shadow.dir));
 });
 
 test('停止', async () => { await server.stop(); });

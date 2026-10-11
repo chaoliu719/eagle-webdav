@@ -1,12 +1,15 @@
 import type * as http from 'http';
 import { send } from '../../http/respond';
 import { isTagsView, pathKey } from '../../vfs/resolver';
+import { writePreconditionFailed } from '../conditional';
 import type { DavContext } from '../context';
+import { etagOf } from '../props';
 
 export async function handleDelete(ctx: DavContext, req: http.IncomingMessage, res: http.ServerResponse, segs: string[]): Promise<void> {
   req.resume();
   const r = await ctx.resolver.resolve(segs);
   if (!r) return send(res, 404, {}, 'Not Found');
+  if (r.kind === 'item' && writePreconditionFailed(req.headers, etagOf(ctx.index.normalize(r.item)))) return send(res, 412, {}, 'Precondition Failed');
   if (isTagsView(r)) return send(res, 403, {}, '「@标签」视图只读');
   switch (r.kind) {
     case 'shadow':

@@ -170,8 +170,10 @@ test('LOCK / 刷新 / UNLOCK 与 lockdiscovery', async () => {
   r = await req('PROPFIND', '/旅行/海报.jpg', { Depth: '0' });
   assert.ok(r.body.includes(token));
 
+  // 设计决定：永不拒绝加锁，已有锁时也发新令牌（Finder 崩溃留下的旧锁不能把自己锁死）
   r = await req('LOCK', '/旅行/海报.jpg', { Depth: '0' }, lockBody);
-  assert.strictEqual(r.status, 423);
+  assert.strictEqual(r.status, 200);
+  assert.notStrictEqual(/<opaquelocktoken:([^>]+)>/.exec(String(r.headers['lock-token']))![1], token);
   r = await req('LOCK', '/旅行/海报.jpg', { If: `(<opaquelocktoken:${token}>)`, Timeout: 'Second-300' });
   assert.strictEqual(r.status, 200);
   assert.ok(r.body.includes('Second-300'));
@@ -180,8 +182,10 @@ test('LOCK / 刷新 / UNLOCK 与 lockdiscovery', async () => {
   assert.strictEqual(r.status, 204);
   r = await req('UNLOCK', '/旅行/海报.jpg', { 'Lock-Token': `<opaquelocktoken:${token}>` });
   assert.strictEqual(r.status, 409);
-  r = await req('LOCK', '/新文件.txt', { Depth: '0' }, lockBody);
+  r = await req('LOCK', '/旅行/新文件.txt', { Depth: '0' }, lockBody);
   assert.strictEqual(r.status, 201);
+  assert.strictEqual((await req('PROPFIND', '/旅行/新文件.txt', { Depth: '0' })).status, 207, '锁定空资源会留下占位');
+  assert.strictEqual((await req('LOCK', '/没有/这个目录/x.txt', { Depth: '0' }, lockBody)).status, 409);
 });
 
 test('停止', async () => { await server.stop(); });

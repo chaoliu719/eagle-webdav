@@ -32,6 +32,8 @@ export interface ItemInfo {
   star: number;
   annotation: string;
   url: string;
+  width?: number;
+  height?: number;
 }
 
 /** 可读文件信息：filePath 每次实时读取（改名会改变磁盘文件名）。 */

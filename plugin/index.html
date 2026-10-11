@@ -35,6 +35,9 @@
   <label>账号 <input type="text" id="user" size="10"></label>
   <label>密码 <input type="password" id="pass" size="14"></label>
 </div>
+<div class="row">
+  <label>额外允许的来源网段 <input type="text" id="cidrs" size="30" placeholder="如 100.64.0.0/10，多个用逗号分隔"></label>
+</div>
 <p class="mut warn" id="hostWarn"></p>
 <div class="row"><button id="btnStart">启动</button><button id="btnStop" class="sec" disabled>停止</button></div>
 <p class="mut" id="urls"></p>

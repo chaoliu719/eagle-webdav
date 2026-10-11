@@ -7,7 +7,9 @@ const pass = process.argv[3] || 'test';
 const base = `http://127.0.0.1:${port}`;
 const auth = 'Basic ' + Buffer.from(`eagle:${pass}`).toString('base64');
 const enc = (p) => p.split('/').map(encodeURIComponent).join('/');
-const T = '/__webdav_test_M3_' + Date.now().toString(36);
+// 第三个参数可复用已有的测试文件夹（避免在资源库里留下更多 __webdav_test_ 文件夹）
+const reuse = process.argv[4];
+const T = reuse || '/__webdav_test_M3_' + Date.now().toString(36);
 
 function png(w, h, rgb) {
   const crcT = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
@@ -37,8 +39,8 @@ const p2 = png(24, 24, [30, 200, 30]);
 const p3 = png(20, 20, [30, 30, 200]);
 const created = [];
 
-let r = await req('MKCOL', T); check('MKCOL 顶层测试文件夹', r.status === 201, String(r.status));
-r = await req('MKCOL', T + '/sub'); check('MKCOL 子文件夹', r.status === 201, String(r.status));
+let r = await req('MKCOL', T); check('MKCOL 顶层测试文件夹', r.status === (reuse ? 405 : 201), String(r.status));
+r = await req('MKCOL', T + '/sub'); check('MKCOL 子文件夹', r.status === 201 || (reuse && r.status === 405), String(r.status));
 r = await req('MKCOL', T); check('MKCOL 已存在 405', r.status === 405);
 
 r = await ms(() => req('PUT', T + '/a.png', { body: p1 })); check('PUT 新建 png', r.status === 201, `${r.status} ${r.ms}ms`);
@@ -94,14 +96,14 @@ r = await req('GET', '/@未分类/__webdav_test_b2.png'); check('@未分类 可�
 r = await req('MOVE', '/@未分类/__webdav_test_b2.png', { headers: dest(T + '/b2.png') }); check('从 @未分类 移回', r.status === 201, String(r.status));
 
 // 文件夹操作
-r = await req('MOVE', T + '/sub', { headers: dest(T + '/sub2') }); check('MOVE 文件夹改名', r.status === 201, String(r.status));
-r = await req('DELETE', T + '/sub2'); check('DELETE 文件夹 403', r.status === 403);
+r = await req('MOVE', T + '/sub', { headers: dest(T + '/sub' + Date.now().toString(36)) }); check('MOVE 文件夹改名', r.status === 201, String(r.status));
+r = await req('DELETE', T); check('DELETE 文件夹 403', r.status === 403);
 
 // DELETE 条目
 for (const n of ['b.png', 'b2.png', 'f.png', 'note.txt']) {
   r = await req('DELETE', T + '/' + n); check(`DELETE ${n}`, r.status === 204, String(r.status));
 }
-r = await req('DELETE', T + '/sub2/b.png'); check('DELETE 多归属条目（一删全删）', r.status === 204 || r.status === 404, String(r.status));
+
 check('测试文件夹已清空条目', (await ls(T)).filter((x) => !x.endsWith('/')).length === 0, JSON.stringify(await ls(T)));
 
 console.log(`\n测试文件夹：${T}（Eagle 无删除文件夹的 API，请手动删除）  失败 ${fails} 项`);

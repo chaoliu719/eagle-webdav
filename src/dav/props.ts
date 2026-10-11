@@ -95,6 +95,8 @@ function eagleProp(name: string, r: DavResource): string | null {
     case 'id': return wrap(it.id);
     case 'tags': return wrap(JSON.stringify(it.tags));
     case 'folders': return wrap(JSON.stringify(it.folders));
+    case 'width': return it.width ? wrap(String(it.width)) : null;
+    case 'height': return it.height ? wrap(String(it.height)) : null;
     case 'star': return wrap(String(it.star));
     case 'annotation': return wrap(it.annotation);
     case 'url': return wrap(it.url);

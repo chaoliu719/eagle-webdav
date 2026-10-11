@@ -19,7 +19,9 @@ function toItem(it: any): ItemInfo {
     modifiedAt: Number(it.modifiedAt ?? 0),
     star: Number(it.star ?? 0),
     annotation: String(it.annotation ?? ''),
-    url: String(it.url ?? '')
+    url: String(it.url ?? ''),
+    width: Number(it.width ?? 0) || undefined,
+    height: Number(it.height ?? 0) || undefined
   };
 }
 

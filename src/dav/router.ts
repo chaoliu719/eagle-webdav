@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import type * as http from 'http';
@@ -7,7 +8,7 @@ import type { LibraryIndex } from '../index/libraryIndex';
 import type { Logger } from '../util/log';
 import { KeyedMutex } from '../util/mutex';
 import { ShadowStore } from '../vfs/shadow';
-import { Resolver, pathKey, type Resolved } from '../vfs/resolver';
+import { Resolver, isCollection, isTagsView, pathKey, type Resolved } from '../vfs/resolver';
 import type { DavContext } from './context';
 import { handleDelete } from './handlers/delete';
 import { handleMkcol } from './handlers/mkcol';
@@ -54,6 +55,13 @@ export class DavRouter {
       maxPut: opts.maxPut ?? 4 * 1024 * 1024 * 1024,
       deadProps: new Map()
     };
+  }
+
+  /** 退出时清理临时文件。 */
+  dispose(): void {
+    this.shadow.clear();
+    try { fs.rmSync(this.shadow.dir, { recursive: true, force: true }); } catch { /* ignore */ }
+    try { fs.rmSync(this.ctx.tmpRoot, { recursive: true, force: true }); } catch { /* ignore */ }
   }
 
   /** 资源库切换：清掉与旧库相关的锁、影子条目与 dead 属性。 */
@@ -179,12 +187,17 @@ export class DavRouter {
     const owner = /<(?:[A-Za-z0-9_.-]+:)?owner(?:\s[^>]*)?>([\s\S]*?)<\/(?:[A-Za-z0-9_.-]+:)?owner>/.exec(body)?.[1] ?? '';
     const depth = String(req.headers['depth'] ?? 'infinity') === '0' ? '0' : 'infinity';
 
-    const existing = this.locks.covering(segs);
-    const held = String(req.headers['if'] ?? '');
-    if (existing.some((l) => (l.scope === 'exclusive' || scope === 'exclusive') && !held.includes(l.token))) {
-      return send(res, 423, {}, 'Locked');
-    }
+    // 设计决定：永不拒绝加锁，已有锁时也发新令牌。真实 Finder 崩溃后会遗留 10 分钟的旧锁，
+    // 若拒绝会让它在锁过期前一直无法写入。这是有意的非强制实现。
     const r = await this.resolver.resolve(segs);
+    if (!r) {
+      // 对不存在的 URL 加锁：在影子区建一个空占位（RFC 4918 的"锁定空资源"），父目录不存在返回 409
+      if (segs.length === 0) return send(res, 409, {}, 'Conflict');
+      const parent = await this.resolver.resolve(segs.slice(0, -1));
+      if (!parent || !isCollection(parent)) return send(res, 409, {}, '父目录不存在');
+      if (parent.kind === 'root' || isTagsView(parent)) return send(res, 403, {}, '这里不能创建文件');
+      this.shadow.putFile(pathKey([...parent.segs, segs[segs.length - 1]]), segs[segs.length - 1], null, 0);
+    }
     const lock = this.locks.create(segs, scope, depth, owner, timeoutSec);
     this.lockResponse(res, r ? 200 : 201, lock);
   }

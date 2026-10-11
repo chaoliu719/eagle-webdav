@@ -44,7 +44,7 @@ export function idSuffix(id: string, length = 6): string {
 
 export interface Entry {
   name: string;
-  kind: 'folder' | 'item' | 'uncat' | 'shadow';
+  kind: 'folder' | 'item' | 'uncat' | 'tags' | 'tag' | 'shadow';
   id: string;
   shadow?: ShadowEntry;
   folder?: FolderInfo;
@@ -84,18 +84,36 @@ export function buildEntries(folders: FolderInfo[], items: ItemInfo[], reserved:
 
 const SUFFIX_RE = / ~([A-Z0-9]{6,13})(\.[^.]+)?$/;
 
+/** 目录子项的查找索引：避免大目录每次线性扫描并反复小写化。 */
+export class EntryIndex {
+  private byName = new Map<string, Entry>();
+  private byKey = new Map<string, Entry>();
+
+  constructor(readonly entries: Entry[]) {
+    for (const e of entries) {
+      this.byName.set(e.name, e);
+      const k = collisionKey(e.name);
+      if (!this.byKey.has(k)) this.byKey.set(k, e);
+    }
+  }
+
+  /** 精确 → 冲突键 → ID 后缀。 */
+  match(rawName: string): Entry | null {
+    const name = rawName.normalize('NFC');
+    const exact = this.byName.get(name);
+    if (exact) return exact;
+    const byKey = this.byKey.get(collisionKey(name));
+    if (byKey) return byKey;
+    const m = SUFFIX_RE.exec(name);
+    if (m) {
+      const suffix = m[1];
+      return this.entries.find((e) => e.id !== '' && e.id.endsWith(suffix)) ?? null;
+    }
+    return null;
+  }
+}
+
 /** 在目录子项中解析一段名字：精确 → 冲突键 → ID 后缀。 */
 export function matchEntry(entries: Entry[], rawName: string): Entry | null {
-  const name = rawName.normalize('NFC');
-  const exact = entries.find((e) => e.name === name);
-  if (exact) return exact;
-  const key = collisionKey(name);
-  const byKey = entries.find((e) => collisionKey(e.name) === key);
-  if (byKey) return byKey;
-  const m = SUFFIX_RE.exec(name);
-  if (m) {
-    const suffix = m[1];
-    return entries.find((e) => e.id.endsWith(suffix)) ?? null;
-  }
-  return null;
+  return new EntryIndex(entries).match(rawName);
 }

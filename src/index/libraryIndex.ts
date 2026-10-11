@@ -2,6 +2,8 @@ import type { EagleAdapter, FolderInfo, ItemInfo } from '../eagle/adapter';
 
 const FRESH_CHECK_MS = 1500;
 const MAX_AGE_MS = 60_000;
+/** 目录缓存里最多保留的条目记录数（LRU 淘汰）。 */
+const MAX_CACHED_ITEMS = 200_000;
 
 /**
  * 文件夹树与按目录懒加载的条目缓存。
@@ -11,6 +13,11 @@ const MAX_AGE_MS = 60_000;
 export class LibraryIndex {
   private folderPromise: Promise<FolderInfo[]> | null = null;
   private itemPromises = new Map<string, Promise<ItemInfo[]>>();
+  private itemCounts = new Map<string, number>();
+  private cachedItems = 0;
+  private tagPromise: Promise<string[]> | null = null;
+  /** 每次缓存失效都会递增，派生缓存（目录列表）据此判断是否过期。 */
+  revision = 0;
   private libMod = -1;
   private libPath = '';
   private checkedAt = 0;
@@ -19,14 +26,23 @@ export class LibraryIndex {
 
   constructor(private adapter: EagleAdapter, private now: () => number = Date.now) {}
 
-  invalidate(): void {
+  private clear(): void {
     this.folderPromise = null;
+    this.tagPromise = null;
     this.itemPromises.clear();
+    this.itemCounts.clear();
+    this.cachedItems = 0;
+    this.revision++;
+  }
+
+  invalidate(): void {
+    this.clear();
     this.libMod = -1;
     this.checkedAt = 0;
   }
 
-  private async refresh(): Promise<void> {
+  /** 检查资源库是否有变化，有则让缓存失效。 */
+  async ensureFresh(): Promise<void> {
     const t = this.now();
     if (t - this.checkedAt < FRESH_CHECK_MS && this.libMod !== -1) return;
     if (!this.checking) {
@@ -34,8 +50,7 @@ export class LibraryIndex {
         const info = await this.adapter.libraryInfo();
         const stale = info.modificationTime !== this.libMod || info.path !== this.libPath || this.now() - this.loadedAt > MAX_AGE_MS;
         if (stale) {
-          this.folderPromise = null;
-          this.itemPromises.clear();
+          this.clear();
           this.loadedAt = this.now();
         }
         this.libMod = info.modificationTime;
@@ -48,17 +63,17 @@ export class LibraryIndex {
 
   /** 最近一次读到的资源库修改时间，用作目录的 getlastmodified 兜底。 */
   async modificationTime(): Promise<number> {
-    await this.refresh();
+    await this.ensureFresh();
     return this.libMod;
   }
 
   async libraryPath(): Promise<string> {
-    await this.refresh();
+    await this.ensureFresh();
     return this.libPath;
   }
 
   async folders(): Promise<FolderInfo[]> {
-    await this.refresh();
+    await this.ensureFresh();
     if (!this.folderPromise) {
       const p = this.adapter.getFolders();
       p.catch(() => { if (this.folderPromise === p) this.folderPromise = null; });
@@ -67,17 +82,48 @@ export class LibraryIndex {
     return this.folderPromise;
   }
 
-  /** folderId 为 null 表示未分类。 */
-  async items(folderId: string | null): Promise<ItemInfo[]> {
-    await this.refresh();
-    const key = folderId ?? '';
-    let p = this.itemPromises.get(key);
-    if (!p) {
-      const created = this.adapter.getItems(folderId);
-      created.catch(() => { if (this.itemPromises.get(key) === created) this.itemPromises.delete(key); });
-      this.itemPromises.set(key, created);
-      p = created;
+  async tags(): Promise<string[]> {
+    await this.ensureFresh();
+    if (!this.tagPromise) {
+      const p = this.adapter.getTags();
+      p.catch(() => { if (this.tagPromise === p) this.tagPromise = null; });
+      this.tagPromise = p;
     }
+    return this.tagPromise;
+  }
+
+  /** folderId 为 null 表示未分类。 */
+  items(folderId: string | null): Promise<ItemInfo[]> {
+    return this.cachedItemsFor('f:' + (folderId ?? ''), () => this.adapter.getItems(folderId));
+  }
+
+  itemsByTag(tag: string): Promise<ItemInfo[]> {
+    return this.cachedItemsFor('t:' + tag, () => this.adapter.getItemsByTag(tag));
+  }
+
+  private async cachedItemsFor(key: string, load: () => Promise<ItemInfo[]>): Promise<ItemInfo[]> {
+    await this.ensureFresh();
+    let p = this.itemPromises.get(key);
+    if (p) {
+      // 命中：移到末尾，表示最近使用
+      this.itemPromises.delete(key);
+      this.itemPromises.set(key, p);
+      return p;
+    }
+    const created = load();
+    created.then((list) => {
+      if (this.itemPromises.get(key) !== created) return;
+      this.itemCounts.set(key, list.length);
+      this.cachedItems += list.length;
+      for (const k of this.itemPromises.keys()) {
+        if (this.cachedItems <= MAX_CACHED_ITEMS || k === key) break;
+        this.cachedItems -= this.itemCounts.get(k) ?? 0;
+        this.itemCounts.delete(k);
+        this.itemPromises.delete(k);
+      }
+    }, () => { if (this.itemPromises.get(key) === created) this.itemPromises.delete(key); });
+    this.itemPromises.set(key, created);
+    p = created;
     return p;
   }
 }

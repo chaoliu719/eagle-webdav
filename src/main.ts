@@ -18,7 +18,7 @@ let configDir = '';
 let store = new ConfigStore(path.join(os.homedir(), '.eagle-webdav', 'eagle-webdav'));
 const adapter: EagleAdapter = new RealEagleAdapter();
 const index = new LibraryIndex(adapter);
-const router = new DavRouter(adapter, index, logger);
+const router = new DavRouter(adapter, index, logger, { tagsView: () => store.get().tagsView });
 const server = new DavServer({ getConfig: () => store.get(), logger, handler: (req, res) => router.handle(req, res) });
 const view = new StatusView(logger);
 

@@ -80,8 +80,8 @@ export class RealEagleAdapter implements EagleAdapter {
     if (folderId !== null) {
       return (await query({ folders: [folderId] })).map(toItem);
     }
-    // 未分类：Plugin API 没有专门查询，取全库再过滤（大库较慢，由索引层缓存）
-    return (await query({})).map(toItem).filter((i) => i.folders.length === 0);
+    // 实测：{ isUnfiled: true } 正确返回未分类；{ folders: [] } 等于不过滤（返回全部）
+    return (await query({ isUnfiled: true })).map(toItem).filter((i) => i.folders.length === 0);
   }
 
   async createFolder(name: string, parentId: string | null): Promise<FolderInfo> {
@@ -167,6 +167,16 @@ export class RealEagleAdapter implements EagleAdapter {
       lines.push('item.get 示例：' + JSON.stringify(toItem(sample)));
     }
     return lines;
+  }
+
+  async getTags(): Promise<string[]> {
+    const tags: any[] = await api().tag.get();
+    const names = tags.map((t) => (typeof t === 'string' ? t : String(t?.name ?? ''))).filter(Boolean);
+    return Array.from(new Set(names));
+  }
+
+  async getItemsByTag(tag: string): Promise<ItemInfo[]> {
+    return (await api().item.get({ tags: [tag] })).map(toItem);
   }
 
   async getItemFile(id: string): Promise<ItemFile | null> {

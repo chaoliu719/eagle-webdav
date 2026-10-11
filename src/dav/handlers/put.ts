@@ -5,7 +5,7 @@ import { Transform } from 'stream';
 import { pipeline } from 'stream/promises';
 import { send } from '../../http/respond';
 import { isSystemName } from '../../vfs/shadow';
-import { isCollection, pathKey } from '../../vfs/resolver';
+import { isCollection, isTagsView, pathKey } from '../../vfs/resolver';
 import type { DavContext } from '../context';
 import { folderIdOf, importAt, makeTmpDir, parentSegsOf, reject, removeDir, splitExt } from './common';
 
@@ -32,6 +32,7 @@ export async function handlePut(ctx: DavContext, req: http.IncomingMessage, res:
   if (!parent || !isCollection(parent)) return reject(req, res, 409, '父目录不存在');
   const target = await ctx.resolver.resolve(segs);
   if (target && isCollection(target)) return reject(req, res, 405, '目标是集合');
+  if (isTagsView(parent) || (target && isTagsView(target))) return reject(req, res, 403, '「@标签」视图只读');
 
   const declared = Number(req.headers['content-length'] ?? 0);
   if (declared > ctx.maxPut) return reject(req, res, 413, '文件过大');

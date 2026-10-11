@@ -46,7 +46,11 @@ PUT 先写影子暂存区，`addFromPath` 加 20s 超时；超时返回 `415` �
 - M1 骨架：已完成并真机验证（Eagle 内启动、OPTIONS、Basic 认证、局域网访问均正常）。已有：配置与 scrypt 密码、源地址过滤、Basic 认证与封禁、OPTIONS、资源库切换 503、状态窗口、EagleAdapter 接口与 Fake
 - M2 只读：已完成并真机验证（Production 库 47 个条目：rclone lsd/ls/copy/check 全部一致，Finder 同款挂载 ls/cp/cmp 正常，列目录约 0.6s，拷贝 0.05s）。**未做**：`@标签` 视图（需先确认标签列表 API）；Finder 手动操作写入留到 M3
 - M3 写入：已完成并真机验证（Production 库，`node test/dev/real-write-smoke.mjs <端口> [密码]` 41 项全部通过；挂载点上 `mkdir/cp/mv/覆盖/rm -f` 均正常）。实现：PUT（新建 addFromPath、覆盖 replaceFile、0 字节占位与系统文件进影子暂存区）、MKCOL、DELETE（条目进回收站，文件夹 403）、MOVE/COPY（条目改名与归属增量修改、同名跨目录按引用、改名真复制并带 tags/star/annotation/url、文件夹改名与移动）、PROPPATCH（E 命名空间 tags/star/annotation/url、原子性、dead 属性存内存）。**未实测**：覆盖时换扩展名（现返回 403）、不识别的扩展名导入（可能弹 Eagle 对话框）、Finder 图形界面里的拖拽拷贝、Infuse/iPad
-- M4 变更监听、性能、大库测试
+- M4：已完成（变更监听、`@标签`、大库缓存与压测）。
+  - 变更监听不另开轮询：每个请求先做新鲜度检查（`library.info().modificationTime`，至少间隔 1.5s，兜底 60s 过期），变化则让文件夹树、条目、标签、目录列表缓存整体失效（`LibraryIndex.revision`）。写操作成功后主动失效。
+  - `@标签`：`eagle.tag.get()` 取标签名（元素为带原型 getter 的对象，取 `.name`），`item.get({tags:[名]})` 取条目；视图只读，PUT/MKCOL/DELETE/MOVE/PROPPATCH 及向其中 COPY 均 403，可从中 COPY 出来；配置 `tagsView` 可关闭。
+  - 未分类改用 `item.get({isUnfiled:true})`（实测正确；`folders:[]` 等于不过滤）。
+  - 缓存：目录列表建了名字/冲突键索引，条目缓存总量 LRU 上限 20 万条。压测（`npx tsx test/dev/bench.ts`，假数据 20 万条）：2 万条目录 Depth:1 约 0.1s、15MB，堆 +20MB；真实瓶颈在 Eagle 自身的 `item.get`，真实大库尚未测过（Production 库仅 48 条）
 
 ## M0 遗留（可边做边验）
 NFC/NFD 文件名、`replaceFile` 换扩展名、跨设备 LAN、完整 R2（关窗口/退出 Eagle）、大库性能、Infuse 与 iPad 客户端抓包。

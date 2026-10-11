@@ -1,7 +1,7 @@
 import type * as http from 'http';
 import { send } from '../../http/respond';
 import { isSystemName } from '../../vfs/shadow';
-import { isCollection, pathKey } from '../../vfs/resolver';
+import { isCollection, isTagsView, pathKey } from '../../vfs/resolver';
 import type { DavContext } from '../context';
 import { parentSegsOf } from './common';
 
@@ -15,6 +15,7 @@ export async function handleMkcol(ctx: DavContext, req: http.IncomingMessage, re
   if (!parent || !isCollection(parent)) return send(res, 409, {}, '父目录不存在');
   if (await ctx.resolver.resolve(segs)) return send(res, 405, {}, '已存在');
 
+  if (isTagsView(parent)) return send(res, 403, {}, '「@标签」视图只读');
   if (parent.kind === 'shadow' || isSystemName(name)) {
     ctx.shadow.putDir(pathKey([...parent.segs, name]), name);
     return send(res, 201);

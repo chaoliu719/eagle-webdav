@@ -5,7 +5,7 @@ import type { ItemFile } from '../../eagle/adapter';
 import { send } from '../../http/respond';
 import { buildName, cleanBase } from '../../vfs/naming';
 import { isSystemName } from '../../vfs/shadow';
-import { isCollection, pathKey, type Resolved } from '../../vfs/resolver';
+import { isCollection, isTagsView, pathKey, type Resolved } from '../../vfs/resolver';
 import type { DavContext } from '../context';
 import { safeLibraryFile } from '../safeFile';
 import { parseRequestPath } from '../path';
@@ -52,6 +52,7 @@ export async function handleTransfer(
 
   const destParent = await ctx.resolver.resolve(parentSegsOf(destSegs));
   if (!destParent || !isCollection(destParent)) return send(res, 409, {}, '目标父目录不存在');
+  if (isTagsView(destParent) || (isMove && isTagsView(src))) return send(res, 403, {}, '「@标签」视图只读');
   const dest = await ctx.resolver.resolve(destSegs);
 
   if (dest && sameNode(src, dest) && pathKey(dest.segs) === pathKey(src.segs) && destName.normalize('NFC') === srcSegs[srcSegs.length - 1].normalize('NFC')) {

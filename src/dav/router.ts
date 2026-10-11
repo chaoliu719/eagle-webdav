@@ -44,10 +44,10 @@ export class DavRouter {
 
   constructor(
     private adapter: EagleAdapter, private index: LibraryIndex, private logger: Logger,
-    opts: { maxPut?: number; tmpRoot?: string; shadowDir?: string } = {}
+    opts: { maxPut?: number; tmpRoot?: string; shadowDir?: string; tagsView?: () => boolean } = {}
   ) {
     this.shadow = new ShadowStore(Date.now, opts.shadowDir);
-    this.resolver = new Resolver(index, this.shadow);
+    this.resolver = new Resolver(index, this.shadow, { tagsView: opts.tagsView });
     this.ctx = {
       adapter, index, resolver: this.resolver, locks: this.locks, shadow: this.shadow, logger, mutex: new KeyedMutex(),
       tmpRoot: opts.tmpRoot ?? path.join(os.tmpdir(), 'eagle-webdav', 'put'),

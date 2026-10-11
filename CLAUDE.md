@@ -57,7 +57,7 @@ Infuse 与 iPad 实机、Finder 图形界面的拖拽、几十万条的真实大
 
 ## 发布与维护
 - 版本 1.0.0；`npm run package` 生成 `dist/eagle-webdav-<版本>.zip`；`npm run check` = 类型检查 + 单元测试 + 构建；CI 见 `.github/workflows/ci.yml`
-- 发布前把 `plugin/manifest.json` 的 `devTools` 改为 `false`（开发期保持 `true`，用它的控制台 `location.reload()` 重载插件页面）
+- `plugin/manifest.json` 的 `devTools` 现为 `false`。开发调试时临时改成 `true` 可弹出开发者工具（控制台可 `location.reload()`）；不开 DevTools 时，用 Eagle 工具栏「插件 → 开发」标签里该插件右侧「…」菜单的「重新加载」，并改完 manifest 后需重新加载才生效
 
 ## 工作约定
 - 每完成一个阶段性工作就提交一次 git（提交信息用中文，带 Co-Authored-By），并把新的结论、约定同步记入本文件

@@ -11,8 +11,9 @@ const logger = new RingLogger((level, msg) => {
   try { if (typeof eagle !== 'undefined') eagle?.log?.[level]?.('[webdav] ' + msg); } catch { /* ignore */ }
 });
 
-const configDir = path.join(userDataDir() ?? path.join(os.homedir(), '.eagle-webdav'), 'eagle-webdav');
-const store = new ConfigStore(configDir);
+// userDataPath 在脚本加载瞬间可能还没就绪，所以到 init 时才确定配置目录
+let configDir = '';
+let store = new ConfigStore(path.join(os.homedir(), '.eagle-webdav', 'eagle-webdav'));
 const adapter: EagleAdapter = new RealEagleAdapter();
 const server = new DavServer({ getConfig: () => store.get(), logger });
 const view = new StatusView(logger);
@@ -26,7 +27,8 @@ function urlsFor(host: string, port: number): string[] {
 
 async function start(): Promise<void> {
   const app = adapter.appInfo();
-  if (app.build < MIN_BUILD) {
+  // build 读不到（0）时无法判断，放行并留下日志
+  if (app.build > 0 && app.build < MIN_BUILD) {
     view.setStatus(`Eagle Build ${app.build} 过低，至少需要 Build ${MIN_BUILD}，请升级 Eagle`, true);
     return;
   }
@@ -50,10 +52,20 @@ async function stop(): Promise<void> {
   view.setStatus('已停止');
 }
 
+let initialized = false;
+
 function init(): void {
+  if (initialized) return;
+  initialized = true;
+  configDir = path.join(userDataDir() ?? path.join(os.homedir(), '.eagle-webdav'), 'eagle-webdav');
+  store = new ConfigStore(configDir);
   const cfg = store.load();
   const app = adapter.appInfo();
   logger.info(`Eagle ${app.version} Build ${app.build}，配置目录 ${configDir}`);
+  try {
+    const keys = typeof eagle !== 'undefined' && eagle?.app ? Object.getOwnPropertyNames(Object.getPrototypeOf(eagle.app)).concat(Object.keys(eagle.app)) : [];
+    logger.info('eagle.app 成员：' + (keys.join(',') || '（无）'));
+  } catch { /* ignore */ }
 
   view.bind({
     onStart(form) {
@@ -89,6 +101,12 @@ function registerLifecycle(): void {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  init();
   registerLifecycle();
+  // 优先等 onPluginCreate，此时 eagle.app 已就绪；取不到事件则兜底延迟初始化
+  if (typeof eagle !== 'undefined' && eagle?.onPluginCreate) {
+    eagle.onPluginCreate(() => init());
+    setTimeout(init, 3000);
+  } else {
+    init();
+  }
 });

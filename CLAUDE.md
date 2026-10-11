@@ -43,7 +43,7 @@ PUT 先写影子暂存区，`addFromPath` 加 20s 超时；超时返回 `415` �
 
 ## 里程碑
 - M0 探针：已完成（`probe/`），遗留项见下
-- M1 骨架：已完成代码与单元测试，待在 Eagle 里真机加载验证（`npm run build` 后把 `plugin/` 作为本地插件加载）。已有：配置与 scrypt 密码、源地址过滤、Basic 认证与封禁、OPTIONS、资源库切换 503、状态窗口、EagleAdapter 接口与 Fake
+- M1 骨架：已完成并真机验证（Eagle 内启动、OPTIONS、Basic 认证、局域网访问均正常）。已有：配置与 scrypt 密码、源地址过滤、Basic 认证与封禁、OPTIONS、资源库切换 503、状态窗口、EagleAdapter 接口与 Fake
 - M2 只读：PROPFIND、GET/HEAD（含 Range），用 Finder 和 rclone 验证
 - M3 写入：PUT、MKCOL、DELETE、MOVE、COPY、PROPPATCH、LOCK/UNLOCK
 - M4 变更监听、性能、大库测试
@@ -52,9 +52,11 @@ PUT 先写影子暂存区，`addFromPath` 加 20s 超时；超时返回 `415` �
 NFC/NFD 文件名、`replaceFile` 换扩展名、跨设备 LAN、完整 R2（关窗口/退出 Eagle）、大库性能、Infuse 与 iPad 客户端抓包。
 
 ## 工作约定
+- 每完成一个阶段性工作就提交一次 git（提交信息用中文，带 Co-Authored-By），并把新的结论、约定同步记入本文件
 - 与用户用中文交流，中文标点用全角，中英文和数字之间加空格；不用画图讲解；需要确认时用文字直接问
 - `probe/` 是只读参考实现，其中 `davcapture.js` 的协议细节、`test/selftest.js` 的协议测试可复用
 - 在真机验证前，不要假设 Eagle API 存在某方法；先查本文件的实测事实
 - 构建与测试：`npm run build`、`npm run typecheck`、`npm test`（tsx + node:test，`test/unit/`）
+- 脚本加载瞬间 `eagle.app` 的 version、build、userDataPath 读不到（曾显示 Build 0），初始化要等 `onPluginCreate`，build 读不到时不拦截启动
 - 源码：`src/{config,http,eagle,util,ui}`；只有 `src/eagle/realAdapter.ts` 可直接碰全局 `eagle`；`eagle.app.userDataPath` 未实测，缺失时回退到 `~/.eagle-webdav`
 - 探针测试：`node probe/test/selftest.js`；与 rclone 对照：`probe/test/compare.sh`

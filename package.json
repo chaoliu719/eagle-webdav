@@ -1,18 +1,21 @@
 {
   "name": "eagle-webdav",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "把 Eagle 资源库以 WebDAV 暴露出来的后台服务插件",
   "scripts": {
     "build": "node build.mjs",
     "watch": "node build.mjs --watch",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test test/unit/*.test.ts"
+    "test": "tsx --test test/unit/*.test.ts",
+    "package": "node scripts/package.mjs",
+    "check": "npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {
     "@types/node": "^16.18.0",
     "esbuild": "^0.25.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
-  }
+  },
+  "license": "MIT"
 }

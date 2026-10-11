@@ -36,13 +36,13 @@
 - 写入序列：`PUT` 0 字节(201) → `LOCK`(Depth 0, Second-600, 独占写) → `PUT` 带 `If: (<opaquelocktoken:...>)` 含真实内容 → `UNLOCK`。读取也会 LOCK → GET → UNLOCK
 - 因此：0 字节 PUT 只进影子暂存区，带内容的 PUT 完成或锁释放时再 `addFromPath`；`.DS_Store`、`._*` 永不入库
 - 需要 `DAV: 1, 2`
-- **Finder 卡顿 60–90s 的根因与修复**：响应要对齐 Go net/http webdav 风格——`Content-Type: text/xml; charset=utf-8`、`creationdate` 不带毫秒、不返回伪造 quota 属性、Allow 头按资源类型给出、`keepAliveTimeout = 0`。见 `probe/plugin/js/davcapture.js`
+- **Finder 卡顿 60–90s 的根因与修复**：响应要对齐 Go net/http webdav 风格——`Content-Type: text/xml; charset=utf-8`、`creationdate` 不带毫秒、不返回伪造 quota 属性、Allow 头按资源类型给出、`keepAliveTimeout = 0`。实现见 `src/http/server.ts`、`src/dav/props.ts`、`src/http/respond.ts`
 
 ## 无扩展名 / 不识别格式的策略
 PUT 先写影子暂存区，`addFromPath` 加 20s 超时；超时返回 `415` 并清理暂存。
 
 ## 里程碑
-- M0 探针：已完成（`probe/`），遗留项见下
+- M0 探针：已完成并已删除，结论都在上文「实测事实」
 - M1 骨架：已完成并真机验证（Eagle 内启动、OPTIONS、Basic 认证、局域网访问均正常）。已有：配置与 scrypt 密码、源地址过滤、Basic 认证与封禁、OPTIONS、资源库切换 503、状态窗口、EagleAdapter 接口与 Fake
 - M2 只读：已完成并真机验证（Production 库 47 个条目：rclone lsd/ls/copy/check 全部一致，Finder 同款挂载 ls/cp/cmp 正常，列目录约 0.6s，拷贝 0.05s）。**未做**：`@标签` 视图（需先确认标签列表 API）；Finder 手动操作写入留到 M3
 - M3 写入：已完成并真机验证（Production 库，`node test/dev/real-write-smoke.mjs <端口> [密码]` 41 项全部通过；挂载点上 `mkdir/cp/mv/覆盖/rm -f` 均正常）。实现：PUT（新建 addFromPath、覆盖 replaceFile、0 字节占位与系统文件进影子暂存区）、MKCOL、DELETE（条目进回收站，文件夹 403）、MOVE/COPY（条目改名与归属增量修改、同名跨目录按引用、改名真复制并带 tags/star/annotation/url、文件夹改名与移动）、PROPPATCH（E 命名空间 tags/star/annotation/url、原子性、dead 属性存内存）。**未实测**：覆盖时换扩展名（现返回 403）、不识别的扩展名导入（可能弹 Eagle 对话框）、Finder 图形界面里的拖拽拷贝、Infuse/iPad
@@ -52,13 +52,17 @@ PUT 先写影子暂存区，`addFromPath` 加 20s 超时；超时返回 `415` �
   - 未分类改用 `item.get({isUnfiled:true})`（实测正确；`folders:[]` 等于不过滤）。
   - 缓存：目录列表建了名字/冲突键索引，条目缓存总量 LRU 上限 20 万条。压测（`npx tsx test/dev/bench.ts`，假数据 20 万条）：2 万条目录 Depth:1 约 0.1s、15MB，堆 +20MB；真实瓶颈在 Eagle 自身的 `item.get`，真实大库尚未测过（Production 库仅 48 条）
 
-## M0 遗留（可边做边验）
-NFC/NFD 文件名、`replaceFile` 换扩展名、跨设备 LAN、完整 R2（关窗口/退出 Eagle）、大库性能、Infuse 与 iPad 客户端抓包。
+## 仍未验证
+Infuse 与 iPad 实机、Finder 图形界面的拖拽、几十万条的真实大库、litmus 协议合规测试、跨设备 LAN 访问（只在本机经局域网 IP 测过）、NFC/NFD 磁盘文件名归一化（服务端按 NFC 匹配路径，已用 NFD 请求验证）。
+
+## 发布与维护
+- 版本 1.0.0；`npm run package` 生成 `dist/eagle-webdav-<版本>.zip`；`npm run check` = 类型检查 + 单元测试 + 构建；CI 见 `.github/workflows/ci.yml`
+- 发布前把 `plugin/manifest.json` 的 `devTools` 改为 `false`（开发期保持 `true`，用它的控制台 `location.reload()` 重载插件页面）
 
 ## 工作约定
 - 每完成一个阶段性工作就提交一次 git（提交信息用中文，带 Co-Authored-By），并把新的结论、约定同步记入本文件
 - 与用户用中文交流，中文标点用全角，中英文和数字之间加空格；不用画图讲解；需要确认时用文字直接问
-- `probe/` 是只读参考实现，其中 `davcapture.js` 的协议细节、`test/selftest.js` 的协议测试可复用
+- M0 探针（`probe/`）已删除，历史在 git 里（最后一次存在于提交 `a8ba0f8` 及之前）；其协议细节已并入 `src/`，协议测试已被 `test/unit/` 取代
 - 在真机验证前，不要假设 Eagle API 存在某方法；先查本文件的实测事实
 - 构建与测试：`npm run build`、`npm run typecheck`、`npm test`（tsx + node:test，`test/unit/`）
 - 脚本加载瞬间 `eagle.app` 的 version、build、userDataPath 读不到（曾显示 Build 0），初始化要等 `onPluginCreate`，build 读不到时不拦截启动
@@ -70,7 +74,7 @@ NFC/NFD 文件名、`replaceFile` 换扩展名、跨设备 LAN、完整 R2（关
 - 吞吐（本机）：80MB PUT 约 3s，GET 约 0.1s；Range 读末尾 1MB 约 40ms；ffprobe / ffmpeg 通过 HTTP 读 mp4（moov 在尾/在头）与 mkv 并 `-ss` 跳转均正常（可代表 Infuse 的取流方式）
 - 补齐项（已真机验证）：写入类方法支持 `If-Match` / `If-None-Match`（412）；LOCK 永不拒绝并对不存在的 URL 建占位（Finder 崩溃留下的旧锁不会把自己锁死）；`E:width` / `E:height`；上传 120s 空闲中止；启动时清理上次遗留的临时目录、退出时 `dispose()`；状态窗口可填「额外允许的来源网段」
 - 未做：litmus 协议合规测试（homebrew 里没有，需手动编译）；dead 属性不落盘；真实锁语义（有意不做）；目录 `getlastmodified` 取目录创建时间而非内部最新修改
-- M0 探针已停用（用户不再使用）；本插件监听 0.0.0.0:41600。探针的 `probe/` 代码仍保留作只读参考
+- M0 探针已停用（用户不再使用）；本插件监听 0.0.0.0:41600
 - 联调：不依赖 Eagle 用 `npx tsx test/dev/fake-server.ts` 起假数据服务；命令行 `mount_webdav` 带 URL 凭据会返回 22，改用 `osascript -e 'mount volume "http://127.0.0.1:41600/" as user name "eagle" with password "..."'`（走 NetFS，与 Finder 一致）；重载插件页面可在其 DevTools 控制台执行 `location.reload()`（屏幕锁定时 GUI 操作不可用）
 - 源码：`src/{config,http,eagle,util,ui}`；只有 `src/eagle/realAdapter.ts` 可直接碰全局 `eagle`；`eagle.app.userDataPath` 未实测，缺失时回退到 `~/.eagle-webdav`
-- 探针测试：`node probe/test/selftest.js`；与 rclone 对照：`probe/test/compare.sh`
+- 与 rclone 对照：`npx tsx test/dev/fake-server.ts` 起假数据服务后用 rclone 联调

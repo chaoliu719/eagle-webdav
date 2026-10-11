@@ -1,3 +1,18 @@
+> **实测修正（Eagle 4.0.0 Build 23）**：本文写于真机验证之前，下列几处已被实测推翻或改变，以仓库根目录 [CLAUDE.md](../CLAUDE.md) 为准。
+>
+> | 本文说法 | 实测结论 |
+> | --- | --- |
+> | `item.get` 带 `fields` 可减小开销（6.1 节） | 带 `fields` 时 `importedAt` / `modifiedAt` 会变成 0，列表查询不用 `fields` |
+> | 未分类用 `item.get({isUnfiled: true, fields})` | `{isUnfiled: true}` 正确；`{folders: []}` 等于不过滤 |
+> | 新导入条目有可用的 `modifiedAt`，ETag 取 id-modifiedAt-size | 新导入为 0 且 `replaceFile` 不更新；取 `modifiedAt \|\| importedAt` 再叠加本服务的替换时间 |
+> | 导入后条目名与请求名一致 | 导入时 Eagle 会删掉 `: ? * " < > \ \| %`、emoji 等；服务按同规则匹配（见 CLAUDE.md） |
+> | 重名消歧后即可 | 内容相同的导入会触发 Eagle「重复添加提示」，需人工确认 |
+> | 5.11：永不拒绝加锁 | 已按此实现（旧版实现曾返回 423，已改） |
+> | 4.1：根目录 PUT | 根目录不能放条目，PUT 返回 403 |
+> | 8.2：`keepAliveTimeout` 65 秒 | 与 Go net/http webdav 对齐，`keepAliveTimeout = 0`，否则 Finder 卡顿 60–90 秒 |
+> | 6.2：后台轮询变更 | 改为按请求惰性检查 `library.info().modificationTime`，无独立轮询 |
+> | 8.1：`src/dav/handlers/*.ts` 等 | 实际目录见 README |
+
 # Eagle WebDAV 后台服务插件：调研结论与详细设计文档
 
 结论先行：按既定路线，在 Eagle 4.0「后台服务」插件里用 Node 的 http 模块手写一个精简的 WebDAV 服务端（Class 1 加假锁 Class 2），技术上可行，而且有官方先例：Eagle 官方的 MCP Server 插件就在插件内监听本地端口，其更新日志里出现过“端口被占用时无法重启”和“阻止局域网其他设备访问”的修复。但调研发现一个必须立即纠正的前提：iOS 与 iPadOS「文件」App 的「连接服务器」在现有资料中只支持 SMB，原生不支持 WebDAV，因此 iPad、iPhone 端需要借助 Infuse 或第三方 WebDAV 文件提供者 App。

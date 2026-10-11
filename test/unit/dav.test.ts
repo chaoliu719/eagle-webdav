@@ -53,7 +53,7 @@ test('PROPFIND 根目录与子目录', async () => {
   let r = await req('PROPFIND', '/', { Depth: '1' });
   assert.strictEqual(r.status, 207);
   assert.match(String(r.headers['content-type']), /^text\/xml; charset=utf-8$/i);
-  assert.deepStrictEqual(hrefs(r.body), ['/', '/旅行/']);
+  assert.deepStrictEqual(hrefs(r.body), ['/', '/@未分类/', '/旅行/']);
   assert.ok(!r.body.includes('quota'));
 
   r = await req('PROPFIND', '/旅行', { Depth: '1' });

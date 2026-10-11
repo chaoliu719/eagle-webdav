@@ -44,7 +44,7 @@ PUT 先写影子暂存区，`addFromPath` 加 20s 超时；超时返回 `415` �
 ## 里程碑
 - M0 探针：已完成（`probe/`），遗留项见下
 - M1 骨架：已完成并真机验证（Eagle 内启动、OPTIONS、Basic 认证、局域网访问均正常）。已有：配置与 scrypt 密码、源地址过滤、Basic 认证与封禁、OPTIONS、资源库切换 503、状态窗口、EagleAdapter 接口与 Fake
-- M2 只读：代码与单元测试已完成，待真机验证（Finder、rclone）。已有：PROPFIND（Depth 0/1，流式输出）、GET/HEAD（Range、条件请求、库内路径校验）、假 LOCK/UNLOCK（Finder 读取也要锁）、目录名消歧、索引缓存（按 `library.info().modificationTime` 失效）。**未做**：`@标签` 视图（需先确认标签列表 API）
+- M2 只读：代码、单元测试、rclone 对假数据服务（`npx tsx test/dev/fake-server.ts`）均已通过；待在真实 Eagle 里重载插件验证，并用 Finder 挂载验证（命令行 `mount_webdav` 在锁屏时返回 22，需要解锁的桌面会话）。已有：PROPFIND（Depth 0/1，流式输出）、GET/HEAD（Range、条件请求、库内路径校验）、假 LOCK/UNLOCK（Finder 读取也要锁）、目录名消歧、索引缓存（按 `library.info().modificationTime` 失效）。**未做**：`@标签` 视图（需先确认标签列表 API）
 - M3 写入：PUT、MKCOL、DELETE、MOVE、COPY、PROPPATCH、LOCK/UNLOCK
 - M4 变更监听、性能、大库测试
 

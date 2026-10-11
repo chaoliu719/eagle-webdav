@@ -145,7 +145,7 @@ export class DavRouter {
   private async listing(res: http.ServerResponse, r: Resolved): Promise<void> {
     const entries = await this.resolver.children(r);
     const li = entries.map((e) => {
-      const d = e.kind === 'folder';
+      const d = e.kind !== 'item';
       return `<li><a href="${escXml(hrefOf([...r.segs, e.name], d))}">${escXml(e.name + (d ? '/' : ''))}</a></li>`;
     }).join('');
     const title = escXml(hrefOf(r.segs, true));

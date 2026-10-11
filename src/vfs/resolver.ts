@@ -28,7 +28,7 @@ export class Resolver {
     const folders = await this.index.folders();
     if (r.kind === 'root') {
       const top = folders.filter((f) => f.parentId === null);
-      return buildEntries(top, [], [UNCATEGORIZED]);
+      return [{ name: UNCATEGORIZED, kind: 'uncat', id: '' }, ...buildEntries(top, [], [UNCATEGORIZED])];
     }
     if (r.kind === 'uncat') {
       return buildEntries([], await this.index.items(null));
@@ -50,7 +50,9 @@ export class Resolver {
       const hit = matchEntry(entries, segs[i]);
       if (!hit) return null;
       const next: string[] = [...cur.segs, hit.name];
-      if (hit.kind === 'folder') {
+      if (hit.kind === 'uncat') {
+        cur = { kind: 'uncat', segs: [UNCATEGORIZED] };
+      } else if (hit.kind === 'folder') {
         cur = { kind: 'folder', segs: next, folder: hit.folder as FolderInfo };
       } else {
         cur = {

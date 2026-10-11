@@ -43,7 +43,7 @@ export function idSuffix(id: string, length = 6): string {
 
 export interface Entry {
   name: string;
-  kind: 'folder' | 'item';
+  kind: 'folder' | 'item' | 'uncat';
   id: string;
   folder?: FolderInfo;
   item?: ItemInfo;

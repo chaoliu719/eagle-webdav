@@ -79,6 +79,7 @@ export async function handlePut(ctx: DavContext, req: http.IncomingMessage, res:
       const file = path.join(tmpDir, name);
       await fs.promises.rename(tmp, file);
       await ctx.mutex.run(id, () => ctx.adapter.replaceFile(id, file));
+      ctx.index.touch(id);
       ctx.index.invalidate();
       return send(res, 204);
     }

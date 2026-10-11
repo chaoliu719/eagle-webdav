@@ -4,12 +4,19 @@ import type * as http from 'http';
 import * as path from 'path';
 import { ImportTimeoutError } from '../../eagle/adapter';
 import { send } from '../../http/respond';
+import { eagleSanitizeName } from '../../vfs/naming';
 import { pathKey, type Resolved } from '../../vfs/resolver';
 import type { DavContext } from '../context';
 
 export function splitExt(name: string): { base: string; ext: string } {
   const ext = path.extname(name).slice(1);
   return { base: ext ? name.slice(0, -(ext.length + 1)) : name, ext };
+}
+
+/** 条目名在 Eagle 去掉不支持的字符后为空（例如纯 emoji），导入后会得到随机名字，无法再按路径找到。 */
+export function unusableItemName(name: string): boolean {
+  const { base } = splitExt(name);
+  return eagleSanitizeName(base + '.x') === '.x';
 }
 
 export function parentSegsOf(segs: string[]): string[] { return segs.slice(0, -1); }
@@ -40,6 +47,7 @@ export type ImportOutcome = { ok: true; id: string } | { ok: false; status: numb
 export async function importAt(ctx: DavContext, file: string, name: string, folderId: string | null): Promise<ImportOutcome> {
   const { base, ext } = splitExt(name);
   if (!ext) return { ok: false, status: 415, message: 'Eagle 不支持没有扩展名的文件' };
+  if (unusableItemName(name)) return { ok: false, status: 400, message: '文件名在 Eagle 中不可用（去掉不支持的字符后为空）' };
   try {
     const id = await ctx.adapter.importFile(file, { name: base, folders: folderId === null ? [] : [folderId] });
     ctx.index.invalidate();

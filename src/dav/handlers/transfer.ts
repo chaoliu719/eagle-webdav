@@ -9,7 +9,7 @@ import { isCollection, isTagsView, pathKey, type Resolved } from '../../vfs/reso
 import type { DavContext } from '../context';
 import { safeLibraryFile } from '../safeFile';
 import { parseRequestPath } from '../path';
-import { folderIdOf, importAt, makeTmpDir, parentSegsOf, removeDir, splitExt } from './common';
+import { folderIdOf, importAt, unusableItemName, makeTmpDir, parentSegsOf, removeDir, splitExt } from './common';
 
 /** 解析 Destination 头；主机与本服务不一致返回 'foreign'。 */
 function parseDestination(req: http.IncomingMessage): string[] | 'bad' | 'foreign' {
@@ -108,6 +108,8 @@ async function transferItem(
     ? destName.toLowerCase().endsWith('.' + live.ext.toLowerCase())
     : !splitExt(destName).ext;
   const newBase = live.ext ? destName.slice(0, -(live.ext.length + 1)) : destName;
+
+  if (unusableItemName(destName)) return send(res, 400, {}, '文件名在 Eagle 中不可用（去掉不支持的字符后为空）');
 
   if (isMove) {
     if (!extOk) return send(res, 403, {}, '扩展名只读，不能通过改名修改');

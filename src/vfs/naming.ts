@@ -84,6 +84,21 @@ export function buildEntries(folders: FolderInfo[], items: ItemInfo[], reserved:
 
 const SUFFIX_RE = / ~([A-Z0-9]{6,13})(\.[^.]+)?$/;
 
+// 实测 Eagle 4.0.0 Build 23 会在条目名里直接删除这些字符（文件夹名不会）：
+// " % * : < > ? \ |、控制字符、格式字符（软连字符、零宽、方向标记、BOM）、emoji 与符号（©®™★❤ 等）、
+// 所有辅助平面字符（含 𠮷 与旗帜）。保留 # & ; = , [ ] ' ~ ( ) 以及 CJK、重音字母、不间断空格。
+// eslint-disable-next-line no-control-regex
+const EAGLE_STRIP = /["%*:<>?\\|\u0000-\u001f\u007f\u00ad\u200b-\u200f\u202a-\u202e\u2060\ufeff\u2605]|\p{Extended_Pictographic}|[\u{10000}-\u{10FFFF}]/gu;
+
+/** 模拟 Eagle 对条目名的处理，用来把客户端请求的名字映射到实际存储的名字。 */
+export function eagleSanitizeName(name: string): string {
+  const s = name.normalize('NFC').replace(EAGLE_STRIP, '');
+  const i = s.lastIndexOf('.');
+  const base = i > 0 ? s.slice(0, i) : s;
+  const ext = i > 0 ? s.slice(i) : '';
+  return base.replace(/^\s+|[\s.]+$/g, '') + ext;
+}
+
 /** 目录子项的查找索引：避免大目录每次线性扫描并反复小写化。 */
 export class EntryIndex {
   private byName = new Map<string, Entry>();
@@ -104,6 +119,13 @@ export class EntryIndex {
     if (exact) return exact;
     const byKey = this.byKey.get(collisionKey(name));
     if (byKey) return byKey;
+    // Eagle 会改写条目名（去 emoji、: ? 等）、我们会修剪尾部空格与点：用同样的规则再找一次
+    for (const alt of [eagleSanitizeName(name), name.replace(/[\s.]+$/, '')]) {
+      if (alt && alt !== name) {
+        const hit = this.byName.get(alt) ?? this.byKey.get(collisionKey(alt));
+        if (hit) return hit;
+      }
+    }
     const m = SUFFIX_RE.exec(name);
     if (m) {
       const suffix = m[1];

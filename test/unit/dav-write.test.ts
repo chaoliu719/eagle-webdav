@@ -71,6 +71,23 @@ test('PUT 新建 / 覆盖 / 约束', async () => {
   assert.deepStrictEqual(fake.items.find((i) => i.name === 'loose')?.folders, []);
 });
 
+test('同样大小的内容覆盖后 ETag 与 Last-Modified 也要变化；modifiedAt 为 0 时不出现 1970', async () => {
+  const it = fake.addItem('same', 'txt', 'AAAA', [A.id]);
+  it.modifiedAt = 0; // 模拟 Eagle：新导入条目 modifiedAt 为 0
+  it.importedAt = 1_700_000_000_000;
+  index.invalidate();
+  let r = await req('GET', '/A/same.txt');
+  const etag1 = String(r.headers['etag']);
+  assert.ok(!/1970/.test(String(r.headers['last-modified'])), 'Last-Modified 不应是 1970');
+  await new Promise((x) => setTimeout(x, 20));
+  assert.strictEqual((await req('PUT', '/A/same.txt', {}, 'BBBB')).status, 204);
+  r = await req('GET', '/A/same.txt');
+  assert.strictEqual(r.body, 'BBBB');
+  assert.notStrictEqual(String(r.headers['etag']), etag1);
+  const pf = await req('PROPFIND', '/A/same.txt', { Depth: '0' });
+  assert.ok(pf.body.includes(String(r.headers['etag']).replace(/"/g, '&quot;')) || pf.body.includes(String(r.headers['etag'])), 'PROPFIND 与 GET 的 ETag 一致');
+});
+
 test('Finder 写入序列：0 字节占位 → LOCK → 带内容 PUT → UNLOCK', async () => {
   const before = fake.items.length;
   let r = await req('PUT', '/B/finder.txt', {}, '');

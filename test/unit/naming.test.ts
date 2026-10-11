@@ -1,6 +1,6 @@
 import assert from 'assert';
 import { test } from 'node:test';
-import { buildEntries, buildName, cleanBase, matchEntry } from '../../src/vfs/naming';
+import { buildEntries, buildName, cleanBase, eagleSanitizeName, matchEntry } from '../../src/vfs/naming';
 import type { FolderInfo, ItemInfo } from '../../src/eagle/adapter';
 
 const item = (id: string, name: string, ext: string, importedAt: number): ItemInfo =>
@@ -37,4 +37,22 @@ test('保留名占用与旧路径的 ID 后缀解析', () => {
   assert.strictEqual(matchEntry(it, 'a ~AAAAA2.jpg')?.id, 'AAAAAAAAAAAA2');
   assert.strictEqual(matchEntry(it, 'A.JPG')?.id, 'AAAAAAAAAAAA1');
   assert.strictEqual(matchEntry(it, 'nope.jpg'), null);
+});
+
+test('模拟 Eagle 对条目名的改写，并据此匹配请求路径', () => {
+  const cases: Array<[string, string]> = [
+    ['emoji😀.txt', 'emoji.txt'], ['a:b.txt', 'ab.txt'], ['a"b.txt', 'ab.txt'], ['a<b>c.txt', 'abc.txt'], ['a%b.txt', 'ab.txt'],
+    ['a\\b|c?d*e.txt', 'abcde.txt'], ['a\u200bb.txt', 'ab.txt'], ['a\u00adb.txt', 'ab.txt'], ['a🇨🇳b.txt', 'ab.txt'],
+    ['a𠮷b.txt', 'ab.txt'], ['a★b.txt', 'ab.txt'], ['a❤b.txt', 'ab.txt'], ['a✨b.txt', 'ab.txt'], ['trail .txt', 'trail.txt'],
+    [' lead.txt', 'lead.txt'], ['dots...txt', 'dots.txt'],
+    // 保留的
+    ['a#b&c;d=e,f.txt', 'a#b&c;d=e,f.txt'], ["it's [1] (2).txt", "it's [1] (2).txt"], ['a\u00a0b.txt', 'a\u00a0b.txt'],
+    ['日本語.txt', '日本語.txt'], ['héllo.txt', 'héllo.txt'], ['a✓b.txt', 'a✓b.txt'], ['.hidden.txt', '.hidden.txt'], ['a~b.txt', 'a~b.txt']
+  ];
+  for (const [input, want] of cases) assert.strictEqual(eagleSanitizeName(input), want, input);
+  assert.strictEqual(eagleSanitizeName('😀.txt'), '.txt');
+
+  const e = buildEntries([], [item('AAAAAAAAAAAA1', 'emoji', 'txt', 1), item('AAAAAAAAAAAA2', 'ab', 'txt', 2)]);
+  assert.strictEqual(matchEntry(e, 'emoji😀.txt')?.id, 'AAAAAAAAAAAA1');
+  assert.strictEqual(matchEntry(e, 'a:b.txt')?.id, 'AAAAAAAAAAAA2');
 });

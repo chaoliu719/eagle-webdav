@@ -135,8 +135,9 @@ export class DavRouter {
     if (r.kind !== 'item') return this.listing(res, r);
 
     // 每次都实时读取 filePath：改名会改变磁盘文件名
-    const live = await this.adapter.getItemFile(r.item.id);
-    if (!live) return send(res, 404, {}, 'Not Found');
+    const raw = await this.adapter.getItemFile(r.item.id);
+    if (!raw) return send(res, 404, {}, 'Not Found');
+    const live = this.index.normalize(raw);
     const file = await safeLibraryFile(await this.index.libraryPath(), live.filePath);
     if (!file) {
       this.logger.warn(`拒绝读取库外文件：${live.id}`);

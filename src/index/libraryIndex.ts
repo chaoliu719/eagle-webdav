@@ -18,6 +18,8 @@ export class LibraryIndex {
   private tagPromise: Promise<string[]> | null = null;
   /** 每次缓存失效都会递增，派生缓存（目录列表）据此判断是否过期。 */
   revision = 0;
+  /** 本服务替换过内容的条目 → 时间戳。Eagle 的 replaceFile 不更新 modifiedAt，靠它让 ETag 随内容变化。 */
+  private touched = new Map<string, number>();
   private libMod = -1;
   private libPath = '';
   private checkedAt = 0;
@@ -39,6 +41,22 @@ export class LibraryIndex {
     this.clear();
     this.libMod = -1;
     this.checkedAt = 0;
+  }
+
+  /** 记录条目内容被本服务替换。 */
+  touch(id: string): void {
+    this.touched.set(id, Date.now());
+  }
+
+  /**
+   * 统一条目的"有效修改时间"：新导入的条目 modifiedAt 为 0（实测，仅编辑后才更新），
+   * 此时退回 importedAt；再与本服务替换内容的时间取较大者。
+   */
+  normalize<T extends ItemInfo>(it: T): T {
+    const base = it.modifiedAt || it.importedAt || 0;
+    const t = this.touched.get(it.id) ?? 0;
+    const eff = Math.max(base, t);
+    return eff === it.modifiedAt ? it : { ...it, modifiedAt: eff };
   }
 
   /** 检查资源库是否有变化，有则让缓存失效。 */
@@ -110,7 +128,7 @@ export class LibraryIndex {
       this.itemPromises.set(key, p);
       return p;
     }
-    const created = load();
+    const created = load().then((list) => list.map((i) => this.normalize(i)));
     created.then((list) => {
       if (this.itemPromises.get(key) !== created) return;
       this.itemCounts.set(key, list.length);

@@ -250,6 +250,22 @@ test('PROPPATCH：E 属性、原子性、dead 属性', async () => {
   assert.strictEqual((await req('PROPPATCH', '/A/nope.txt', {}, body('<D:set><D:prop><X:a>1</X:a></D:prop></D:set>'))).status, 404);
 });
 
+test('客户端上传中途断开：不入库，临时文件被清理', async () => {
+  const before = fake.items.length;
+  const putRoot = path.join(dir, 'put');
+  await new Promise<void>((resolve) => {
+    const r = http.request({ host: '127.0.0.1', port: PORT, method: 'PUT', path: enc('/A/aborted.txt'), headers: { ...AUTH, 'Content-Length': '100000' } });
+    r.on('error', () => resolve());
+    r.write('partial');
+    setTimeout(() => { r.destroy(); resolve(); }, 100);
+  });
+  await new Promise((x) => setTimeout(x, 300));
+  assert.strictEqual(fake.items.length, before);
+  const left = fs.existsSync(putRoot) ? fs.readdirSync(putRoot) : [];
+  assert.deepStrictEqual(left, [], '临时目录应已清理');
+  assert.strictEqual((await req('GET', '/A/aborted.txt')).status, 404);
+});
+
 test('资源库切换后影子条目被清空', async () => {
   await req('PUT', '/A/.DS_Store', {}, 'junk');
   router.reset();

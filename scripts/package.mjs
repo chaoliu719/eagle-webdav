@@ -1,6 +1,7 @@
-// 打包：构建后把 plugin/ 压成 dist/eagle-webdav-<版本>.zip，解压即得 Eagle 可加载的插件目录。
+// 打包：构建后把 plugin/ 压成 dist/eagle-webdav-<版本>.eagleplugin。
+// 实测 Eagle「打包插件」生成的 .eagleplugin 就是 plugin/ 内容的 zip，结构与这里一致；同时留一份 .zip 方便解压后用「导入本地项目」加载。
 import { execFileSync } from 'child_process';
-import { mkdirSync, readFileSync, rmSync } from 'fs';
+import { copyFileSync, mkdirSync, readFileSync, rmSync } from 'fs';
 
 const manifest = JSON.parse(readFileSync('plugin/manifest.json', 'utf8'));
 if (manifest.main?.devTools || manifest.devTools) {
@@ -11,4 +12,6 @@ mkdirSync('dist', { recursive: true });
 const out = `eagle-webdav-${manifest.version}.zip`;
 rmSync(`dist/${out}`, { force: true });
 execFileSync('zip', ['-r', '-q', `../dist/${out}`, '.', '-x', '.DS_Store', '*/.DS_Store'], { cwd: 'plugin', stdio: 'inherit' });
-console.log(`已生成 dist/${out}`);
+const pkg = out.replace(/\.zip$/, '.eagleplugin');
+copyFileSync(`dist/${out}`, `dist/${pkg}`);
+console.log(`已生成 dist/${out} 与 dist/${pkg}`);

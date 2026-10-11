@@ -55,7 +55,7 @@ test('认证、OPTIONS、501、503', async () => {
   assert.strictEqual(r.headers['dav'], '1, 2');
   r = await req('PROPFIND', AUTH);
   assert.strictEqual(r.status, 403);
-  r = await req('MKCOL', AUTH);
+  r = await req('REPORT', AUTH);
   assert.strictEqual(r.status, 501);
   server.setSwitching(true);
   r = await req('OPTIONS', AUTH);

@@ -1,16 +1,25 @@
-import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import type * as http from 'http';
 import type { EagleAdapter } from '../eagle/adapter';
 import { readBody, send, sendXml } from '../http/respond';
 import type { LibraryIndex } from '../index/libraryIndex';
 import type { Logger } from '../util/log';
-import { Resolver, type Resolved } from '../vfs/resolver';
-import { evaluate, ifRangeAllows, parseRange } from './conditional';
+import { KeyedMutex } from '../util/mutex';
+import { ShadowStore } from '../vfs/shadow';
+import { Resolver, pathKey, type Resolved } from '../vfs/resolver';
+import type { DavContext } from './context';
+import { handleDelete } from './handlers/delete';
+import { handleMkcol } from './handlers/mkcol';
+import { handleProppatch } from './handlers/proppatch';
+import { handlePut } from './handlers/put';
+import { handleTransfer } from './handlers/transfer';
 import { activeLockXml, LockManager } from './locks';
 import { escXml, hrefOf, parseRequestPath } from './path';
 import { etagOf, resourceOfEntry, resourceOfResolved, responseXml } from './props';
 import { hasDoctype, parsePropfind } from './xml';
 import { safeLibraryFile } from './safeFile';
+import { serveFile } from './serve';
 
 const MAX_XML_BODY = 1024 * 1024;
 const YIELD_EVERY = 500;
@@ -29,10 +38,29 @@ function write(res: http.ServerResponse, chunk: string): Promise<void> | void {
 
 export class DavRouter {
   readonly locks = new LockManager();
+  readonly shadow: ShadowStore;
   private resolver: Resolver;
+  private ctx: DavContext;
 
-  constructor(private adapter: EagleAdapter, private index: LibraryIndex, private logger: Logger) {
-    this.resolver = new Resolver(index);
+  constructor(
+    private adapter: EagleAdapter, private index: LibraryIndex, private logger: Logger,
+    opts: { maxPut?: number; tmpRoot?: string; shadowDir?: string } = {}
+  ) {
+    this.shadow = new ShadowStore(Date.now, opts.shadowDir);
+    this.resolver = new Resolver(index, this.shadow);
+    this.ctx = {
+      adapter, index, resolver: this.resolver, locks: this.locks, shadow: this.shadow, logger, mutex: new KeyedMutex(),
+      tmpRoot: opts.tmpRoot ?? path.join(os.tmpdir(), 'eagle-webdav', 'put'),
+      maxPut: opts.maxPut ?? 4 * 1024 * 1024 * 1024,
+      deadProps: new Map()
+    };
+  }
+
+  /** 资源库切换：清掉与旧库相关的锁、影子条目与 dead 属性。 */
+  reset(): void {
+    this.shadow.clear();
+    this.ctx.deadProps.clear();
+    this.index.invalidate();
   }
 
   async handle(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
@@ -44,6 +72,12 @@ export class DavRouter {
       case 'PROPFIND': return this.propfind(req, res, parsed.segs);
       case 'GET':
       case 'HEAD': return this.get(req, res, parsed.segs);
+      case 'PUT': return handlePut(this.ctx, req, res, parsed.segs);
+      case 'MKCOL': return handleMkcol(this.ctx, req, res, parsed.segs);
+      case 'DELETE': return handleDelete(this.ctx, req, res, parsed.segs);
+      case 'MOVE': return handleTransfer(this.ctx, req, res, parsed.segs, true);
+      case 'COPY': return handleTransfer(this.ctx, req, res, parsed.segs, false);
+      case 'PROPPATCH': return handleProppatch(this.ctx, req, res, parsed.segs);
       case 'LOCK': return this.lock(req, res, parsed.segs);
       case 'UNLOCK': return this.unlock(req, res);
       default:
@@ -55,7 +89,8 @@ export class DavRouter {
   private async options(req: http.IncomingMessage, res: http.ServerResponse, segs: string[]): Promise<void> {
     req.resume();
     const r = await this.resolver.resolve(segs);
-    const allow = !r ? ALLOW_MISSING : r.kind === 'item' ? ALLOW_FILE : ALLOW_DIR;
+    const isFile = r && (r.kind === 'item' || (r.kind === 'shadow' && !r.entry.isDir));
+    const allow = !r ? ALLOW_MISSING : isFile ? ALLOW_FILE : ALLOW_DIR;
     send(res, 200, { DAV: '1, 2', Allow: allow, 'MS-Author-Via': 'DAV' });
   }
 
@@ -75,13 +110,13 @@ export class DavRouter {
 
     res.writeHead(207, { Server: 'EagleWebdav/0.1', 'Content-Type': 'text/xml; charset=utf-8' });
     await write(res, '<?xml version="1.0" encoding="utf-8"?>\n<D:multistatus xmlns:D="DAV:">');
-    await write(res, responseXml(resourceOfResolved(r, fallback), request, this.locks));
+    await write(res, responseXml(resourceOfResolved(r, fallback), request, this.locks, this.ctx.deadProps.get(pathKey(r.segs))));
     if (depth === '1' && r.kind !== 'item') {
       const entries = await this.resolver.children(r);
       if (entries.length > WARN_ENTRIES) this.logger.warn(`目录条目过多：${hrefOf(r.segs, true)} 共 ${entries.length} 项`);
       let n = 0;
       for (const e of entries) {
-        await write(res, responseXml(resourceOfEntry(r.segs, e, fallback), request, this.locks));
+        await write(res, responseXml(resourceOfEntry(r.segs, e, fallback), request, this.locks, this.ctx.deadProps.get(pathKey([...r.segs, e.name]))));
         if (++n % YIELD_EVERY === 0) await tick();
       }
     }
@@ -92,6 +127,11 @@ export class DavRouter {
     req.resume();
     const r = await this.resolver.resolve(segs);
     if (!r) return send(res, 404, {}, 'Not Found');
+    if (r.kind === 'shadow' && !r.entry.isDir) {
+      const e = r.entry;
+      if (!e.file) return serveFile(req, res, { realPath: '', size: 0, mime: resourceOfResolved(r, 0).mime, etag: `"shadow-${e.modified}-0"`, lastModified: e.modified }, this.logger);
+      return serveFile(req, res, { realPath: e.file, size: e.size, mime: resourceOfResolved(r, 0).mime, etag: `"shadow-${e.modified}-${e.size}"`, lastModified: e.modified }, this.logger);
+    }
     if (r.kind !== 'item') return this.listing(res, r);
 
     // 每次都实时读取 filePath：改名会改变磁盘文件名
@@ -102,44 +142,11 @@ export class DavRouter {
       this.logger.warn(`拒绝读取库外文件：${live.id}`);
       return send(res, 404, {}, 'Not Found');
     }
-    const size = file.size;
-    if (size !== live.size) this.index.invalidate();
-    const etag = etagOf(live);
-    const lastModified = live.modifiedAt < 1e11 ? live.modifiedAt * 1000 : live.modifiedAt;
-    const headers: http.OutgoingHttpHeaders = {
-      Server: 'EagleWebdav/0.1',
-      'Content-Type': resourceOfResolved(r, 0).mime,
-      ETag: etag,
-      'Last-Modified': new Date(lastModified).toUTCString(),
-      'Accept-Ranges': 'bytes'
-    };
-
-    const pre = evaluate(req.headers, { etag, lastModified });
-    if (pre === 'precondition-failed') return send(res, 412, headers);
-    if (pre === 'not-modified') return send(res, 304, headers);
-
-    let start = 0;
-    let end = size - 1;
-    let status = 200;
-    const range = ifRangeAllows(req.headers, { etag, lastModified }) ? parseRange(req.headers['range'], size) : { kind: 'none' as const };
-    if (range.kind === 'unsatisfiable') return send(res, 416, { ...headers, 'Content-Range': `bytes */${size}` });
-    if (range.kind === 'range') {
-      status = 206;
-      start = range.start;
-      end = range.end;
-      headers['Content-Range'] = `bytes ${start}-${end}/${size}`;
-    }
-    headers['Content-Length'] = size === 0 ? 0 : end - start + 1;
-    res.writeHead(status, headers);
-    if (req.method === 'HEAD' || size === 0) return void res.end();
-
-    const stream = fs.createReadStream(file.realPath, { start, end });
-    res.on('close', () => stream.destroy());
-    stream.on('error', (e) => {
-      this.logger.error(`读取文件失败：${e.message}`);
-      res.destroy();
-    });
-    stream.pipe(res);
+    if (file.size !== live.size) this.index.invalidate();
+    serveFile(req, res, {
+      realPath: file.realPath, size: file.size, mime: resourceOfResolved(r, 0).mime, etag: etagOf(live),
+      lastModified: live.modifiedAt < 1e11 ? live.modifiedAt * 1000 : live.modifiedAt
+    }, this.logger);
   }
 
   private async listing(res: http.ServerResponse, r: Resolved): Promise<void> {

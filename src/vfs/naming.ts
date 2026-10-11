@@ -1,4 +1,5 @@
 import type { FolderInfo, ItemInfo } from '../eagle/adapter';
+import type { ShadowEntry } from './shadow';
 
 const MAX_NAME_BYTES = 255;
 
@@ -43,8 +44,9 @@ export function idSuffix(id: string, length = 6): string {
 
 export interface Entry {
   name: string;
-  kind: 'folder' | 'item' | 'uncat';
+  kind: 'folder' | 'item' | 'uncat' | 'shadow';
   id: string;
+  shadow?: ShadowEntry;
   folder?: FolderInfo;
   item?: ItemInfo;
 }

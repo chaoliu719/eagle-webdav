@@ -4,7 +4,7 @@ import { buildEntries, buildName, cleanBase, matchEntry } from '../../src/vfs/na
 import type { FolderInfo, ItemInfo } from '../../src/eagle/adapter';
 
 const item = (id: string, name: string, ext: string, importedAt: number): ItemInfo =>
-  ({ id, name, ext, size: 1, folders: [], tags: [], importedAt, modifiedAt: 1 });
+  ({ id, name, ext, size: 1, folders: [], tags: [], importedAt, modifiedAt: 1, star: 0, annotation: '', url: '' });
 const folder = (id: string, name: string, createdAt: number): FolderInfo => ({ id, name, parentId: null, createdAt });
 
 test('名字规范化', () => {

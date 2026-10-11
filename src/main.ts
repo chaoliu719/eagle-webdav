@@ -96,7 +96,7 @@ function registerLifecycle(): void {
     view.setStatus('资源库切换中…');
     try {
       // 清空索引缓存；后续里程碑在此一并清理锁与影子条目
-      index.invalidate();
+      router.reset();
       const lib = await adapter.libraryInfo();
       view.setStatus(`运行中 · 资源库：${lib.name}`);
     } catch (e) {

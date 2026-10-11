@@ -1,6 +1,7 @@
 import type { FolderInfo, ItemInfo } from '../eagle/adapter';
 import type { LibraryIndex } from '../index/libraryIndex';
 import { buildEntries, matchEntry, type Entry } from './naming';
+import type { ShadowEntry, ShadowStore } from './shadow';
 
 export const UNCATEGORIZED = '@未分类';
 
@@ -8,10 +9,11 @@ export type Resolved =
   | { kind: 'root'; segs: string[] }
   | { kind: 'uncat'; segs: string[] }
   | { kind: 'folder'; segs: string[]; folder: FolderInfo }
-  | { kind: 'item'; segs: string[]; item: ItemInfo; parentFolderId: string | null };
+  | { kind: 'item'; segs: string[]; item: ItemInfo; parentFolderId: string | null }
+  | { kind: 'shadow'; segs: string[]; entry: ShadowEntry };
 
 export function isCollection(r: Resolved): boolean {
-  return r.kind !== 'item';
+  return r.kind === 'shadow' ? r.entry.isDir : r.kind !== 'item';
 }
 
 /** 规范路径，用作锁等按路径索引的键。 */
@@ -20,11 +22,19 @@ export function pathKey(segs: string[]): string {
 }
 
 export class Resolver {
-  constructor(private index: LibraryIndex) {}
+  constructor(private index: LibraryIndex, private shadow?: ShadowStore) {}
 
   /** 目录子项（含消歧后的名字）。 */
   async children(r: Resolved): Promise<Entry[]> {
     if (r.kind === 'item') return [];
+    const shadows = (this.shadow?.list(pathKey(r.segs)) ?? []).map((e): Entry => ({ name: e.name, kind: 'shadow', id: '', shadow: e }));
+    if (r.kind === 'shadow') return r.entry.isDir ? shadows : [];
+    const real = await this.realChildren(r);
+    const taken = new Set(real.map((e) => e.name.toLowerCase()));
+    return [...real, ...shadows.filter((e) => !taken.has(e.name.toLowerCase()))];
+  }
+
+  private async realChildren(r: Exclude<Resolved, { kind: 'item' | 'shadow' }>): Promise<Entry[]> {
     const folders = await this.index.folders();
     if (r.kind === 'root') {
       const top = folders.filter((f) => f.parentId === null);
@@ -42,13 +52,25 @@ export class Resolver {
     let cur: Resolved = { kind: 'root', segs: [] };
     for (let i = 0; i < segs.length; i++) {
       if (cur.kind === 'item') return null;
+      if (cur.kind === 'shadow') {
+        if (!cur.entry.isDir) return null;
+        const child: ShadowEntry | null | undefined = this.shadow?.get(pathKey([...cur.segs, segs[i]]));
+        if (!child) return null;
+        cur = { kind: 'shadow', segs: [...cur.segs, child.name], entry: child };
+        continue;
+      }
       if (cur.kind === 'root' && segs[i].normalize('NFC') === UNCATEGORIZED) {
         cur = { kind: 'uncat', segs: [UNCATEGORIZED] };
         continue;
       }
       const entries = await this.children(cur);
-      const hit = matchEntry(entries, segs[i]);
-      if (!hit) return null;
+      const hit = matchEntry(entries.filter((e) => e.kind !== 'shadow'), segs[i]);
+      if (!hit) {
+        const sh: ShadowEntry | null | undefined = this.shadow?.get(pathKey([...cur.segs, segs[i].normalize('NFC')]));
+        if (!sh) return null;
+        cur = { kind: 'shadow', segs: [...cur.segs, sh.name], entry: sh };
+        continue;
+      }
       const next: string[] = [...cur.segs, hit.name];
       if (hit.kind === 'uncat') {
         cur = { kind: 'uncat', segs: [UNCATEGORIZED] };

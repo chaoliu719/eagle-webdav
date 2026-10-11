@@ -5,7 +5,7 @@ export type PropfindRequest =
   | { mode: 'propname' }
   | { mode: 'prop'; props: PropName[] };
 
-function nsMap(xml: string): Record<string, string> {
+export function nsMap(xml: string): Record<string, string> {
   const map: Record<string, string> = {};
   const re = /xmlns(?::([A-Za-z0-9_.-]+))?\s*=\s*"([^"]*)"/g;
   let m: RegExpExecArray | null;

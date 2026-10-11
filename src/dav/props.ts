@@ -1,6 +1,8 @@
 import type { ItemInfo } from '../eagle/adapter';
+import type { DeadProp } from './context';
 import { mimeOfExt } from '../util/mime';
 import type { Entry } from '../vfs/naming';
+import type { ShadowEntry } from '../vfs/shadow';
 import type { Resolved } from '../vfs/resolver';
 import { activeLockXml, SUPPORTED_LOCK_XML, type LockManager } from './locks';
 import { escXml, hrefOf } from './path';
@@ -14,6 +16,8 @@ export interface DavResource {
   modified: number;
   created: number;
   etag: string | null;
+  /** 条目的 Eagle 扩展属性来源。 */
+  item?: ItemInfo;
 }
 
 /** Eagle 的时间戳按毫秒；小于 1e11 的当作秒。 */
@@ -30,11 +34,20 @@ function itemResource(segs: string[], it: ItemInfo, fallback: number): DavResour
   return {
     segs, isDir: false, size: it.size, mime: mimeOfExt(it.ext),
     modified: toMs(it.modifiedAt) || fallback, created: toMs(it.importedAt) || toMs(it.modifiedAt) || fallback,
-    etag: etagOf(it)
+    etag: etagOf(it),
+    item: it
+  };
+}
+
+function shadowResource(segs: string[], e: ShadowEntry): DavResource {
+  return {
+    segs, isDir: e.isDir, size: e.size, mime: e.isDir ? 'httpd/unix-directory' : mimeOfExt(e.name.slice(e.name.lastIndexOf('.') + 1)),
+    modified: e.modified, created: e.created, etag: e.isDir ? null : `"shadow-${e.modified}-${e.size}"`
   };
 }
 
 export function resourceOfResolved(r: Resolved, fallback: number): DavResource {
+  if (r.kind === 'shadow') return shadowResource(r.segs, r.entry);
   if (r.kind === 'item') return itemResource(r.segs, r.item, fallback);
   const created = r.kind === 'folder' ? toMs(r.folder.createdAt) || fallback : fallback;
   return { segs: r.segs, isDir: true, size: 0, mime: 'httpd/unix-directory', modified: created, created, etag: null };
@@ -42,6 +55,7 @@ export function resourceOfResolved(r: Resolved, fallback: number): DavResource {
 
 export function resourceOfEntry(parentSegs: string[], e: Entry, fallback: number): DavResource {
   const segs = [...parentSegs, e.name];
+  if (e.shadow) return shadowResource(segs, e.shadow);
   if (e.item) return itemResource(segs, e.item, fallback);
   const created = toMs(e.folder?.createdAt ?? 0) || fallback;
   return { segs, isDir: true, size: 0, mime: 'httpd/unix-directory', modified: created, created, etag: null };
@@ -71,7 +85,24 @@ function propValue(name: string, r: DavResource, locks: LockManager): string | n
   return null;
 }
 
-export function responseXml(r: DavResource, req: PropfindRequest, locks: LockManager): string {
+const EAGLE_NS = 'urn:eagle-webdav:ns';
+
+function eagleProp(name: string, r: DavResource): string | null {
+  const it = r.item;
+  if (!it) return null;
+  const wrap = (v: string) => `<E:${name} xmlns:E="${EAGLE_NS}">${escXml(v)}</E:${name}>`;
+  switch (name) {
+    case 'id': return wrap(it.id);
+    case 'tags': return wrap(JSON.stringify(it.tags));
+    case 'folders': return wrap(JSON.stringify(it.folders));
+    case 'star': return wrap(String(it.star));
+    case 'annotation': return wrap(it.annotation);
+    case 'url': return wrap(it.url);
+  }
+  return null;
+}
+
+export function responseXml(r: DavResource, req: PropfindRequest, locks: LockManager, dead?: Map<string, DeadProp>): string {
   const ok: string[] = [];
   const missing: string[] = [];
   if (req.mode === 'propname') {
@@ -80,7 +111,13 @@ export function responseXml(r: DavResource, req: PropfindRequest, locks: LockMan
     for (const k of ALL_PROPS) { const v = propValue(k, r, locks); if (v !== null) ok.push(v); }
   } else {
     for (const w of req.props) {
-      const v = w.ns === 'DAV:' ? propValue(w.name, r, locks) : null;
+      let v: string | null = null;
+      if (w.ns === 'DAV:') v = propValue(w.name, r, locks);
+      else if (w.ns === EAGLE_NS) v = eagleProp(w.name, r);
+      else if (w.ns && dead?.has(`${w.ns}|${w.name}`)) {
+        const d = dead.get(`${w.ns}|${w.name}`) as DeadProp;
+        v = `<ns0:${w.name} xmlns:ns0="${escXml(d.ns)}">${d.value}</ns0:${w.name}>`;
+      }
       if (v !== null) ok.push(v);
       else if (w.ns && w.ns !== 'DAV:') missing.push(`<ns0:${w.name} xmlns:ns0="${escXml(w.ns)}"/>`);
       else if (w.ns === 'DAV:') missing.push(`<D:${w.name}/>`);

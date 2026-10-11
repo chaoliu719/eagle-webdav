@@ -1,4 +1,4 @@
-import type { AppInfo, EagleAdapter, FolderInfo, ItemFile, ItemInfo, LibrarySummary } from './adapter';
+import { ImportTimeoutError, type AppInfo, type EagleAdapter, type FolderInfo, type FolderPatch, type ItemFile, type ItemInfo, type ItemPatch, type LibrarySummary } from './adapter';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -16,8 +16,16 @@ function toItem(it: any): ItemInfo {
     folders: Array.isArray(it.folders) ? it.folders.map(String) : [],
     tags: Array.isArray(it.tags) ? it.tags.map(String) : [],
     importedAt: Number(it.importedAt ?? 0),
-    modifiedAt: Number(it.modifiedAt ?? 0)
+    modifiedAt: Number(it.modifiedAt ?? 0),
+    star: Number(it.star ?? 0),
+    annotation: String(it.annotation ?? ''),
+    url: String(it.url ?? '')
   };
+}
+
+function toFolder(f: any): FolderInfo {
+  const parentField = typeof f.parent === 'string' ? f.parent : f.parent && f.parent.id ? String(f.parent.id) : null;
+  return { id: String(f.id), name: String(f.name ?? ''), parentId: parentField, createdAt: Number(f.createdAt ?? 0) };
 }
 
 export class RealEagleAdapter implements EagleAdapter {
@@ -74,6 +82,69 @@ export class RealEagleAdapter implements EagleAdapter {
     }
     // 未分类：Plugin API 没有专门查询，取全库再过滤（大库较慢，由索引层缓存）
     return (await query({})).map(toItem).filter((i) => i.folders.length === 0);
+  }
+
+  async createFolder(name: string, parentId: string | null): Promise<FolderInfo> {
+    const e = api();
+    const f = parentId === null ? await e.folder.create({ name }) : await e.folder.createSubfolder(parentId, { name });
+    const info = toFolder(f);
+    if (parentId !== null && info.parentId === null) info.parentId = parentId;
+    return info;
+  }
+
+  async updateFolder(id: string, patch: FolderPatch): Promise<FolderInfo> {
+    const f = await api().folder.getById(id);
+    if (!f) throw new Error('文件夹不存在：' + id);
+    if (patch.name !== undefined) f.name = patch.name;
+    if (patch.description !== undefined) f.description = patch.description;
+    if (patch.parentId !== undefined) f.parent = patch.parentId;
+    await f.save();
+    const fresh = toFolder((await api().folder.getById(id)) ?? f);
+    if (patch.parentId !== undefined) fresh.parentId = patch.parentId;
+    return fresh;
+  }
+
+  async importFile(filePath: string, opts: { name: string; folders: string[]; timeoutMs?: number }): Promise<string> {
+    const p = api().item.addFromPath(filePath, { name: opts.name, folders: opts.folders });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new ImportTimeoutError()), opts.timeoutMs ?? 20_000);
+    });
+    try {
+      const r = await Promise.race([p, timeout]);
+      return String(r && typeof r === 'object' ? (r.id ?? r.itemId) : r);
+    } finally {
+      if (timer) clearTimeout(timer);
+      // 超时后 p 仍可能晚些 reject，避免未处理的拒绝
+      p.catch(() => undefined);
+    }
+  }
+
+  async replaceFile(id: string, filePath: string): Promise<void> {
+    const it = await api().item.getById(id);
+    if (!it) throw new Error('条目不存在：' + id);
+    await it.replaceFile(filePath);
+  }
+
+  async trashItem(id: string): Promise<void> {
+    const it = await api().item.getById(id);
+    if (!it) throw new Error('条目不存在：' + id);
+    await it.moveToTrash();
+  }
+
+  async updateItem(id: string, patch: ItemPatch): Promise<ItemFile> {
+    const it = await api().item.getById(id);
+    if (!it) throw new Error('条目不存在：' + id);
+    if (patch.name !== undefined) it.name = patch.name;
+    if (patch.folders !== undefined) it.folders = patch.folders;
+    if (patch.tags !== undefined) it.tags = patch.tags;
+    if (patch.star !== undefined) it.star = patch.star;
+    if (patch.annotation !== undefined) it.annotation = patch.annotation;
+    if (patch.url !== undefined) it.url = patch.url;
+    await it.save();
+    const fresh = await api().item.getById(id);
+    if (!fresh) throw new Error('保存后无法读取条目：' + id);
+    return { ...toItem(fresh), filePath: String(fresh.filePath ?? '') };
   }
 
   /** 首次启动时的形态自检：把 Folder / Item 实际有哪些成员写进日志，便于核对适配假设。 */

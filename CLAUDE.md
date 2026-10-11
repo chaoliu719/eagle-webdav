@@ -63,7 +63,7 @@ PUT 先写影子暂存区，`addFromPath` 加 20s 超时；超时返回 `415` �
 Infuse 与 iPad 实机、Finder 图形界面的拖拽、几十万条的真实大库、litmus 协议合规测试、跨设备 LAN 访问（只在本机经局域网 IP 测过）、NFC/NFD 磁盘文件名归一化（服务端按 NFC 匹配路径，已用 NFD 请求验证）。
 
 ## 发布与维护
-- 版本 1.0.0；`npm run package` 生成 `dist/eagle-webdav-<版本>.eagleplugin` 与同内容的 `.zip`（实测 Eagle「打包插件」产物就是 plugin/ 内容的 zip，文件名 `Eagle WebDAV.eagleplugin`，生成在项目根目录，已 gitignore；双击/拖入安装的流程未测）；`npm run check` = 类型检查 + 单元测试 + 构建；CI 见 `.github/workflows/ci.yml`
+- 版本 1.0.0；`npm run package` 生成 `dist/eagle-webdav-<版本>.eagleplugin` 与同内容的 `.zip`（实测 Eagle「打包插件」产物就是 plugin/ 内容的 zip，文件名 `Eagle WebDAV.eagleplugin`，生成在项目根目录，已 gitignore）。**安装流程已真机验证**：`open dist/eagle-webdav-<版本>.eagleplugin`（双击同理）→ Eagle 弹出「Install eagle-webdav-<版本>?」→ 点 Install → 装到 `~/Library/Application Support/Eagle/Plugins/EAGLEWEBDAV01`，`runAfterInstall` 使服务立即自启并沿用 `eagle-webdav/config.json`；「开发」标签里的「卸载」只移除登记，不删项目源码，也不删配置目录；`npm run check` = 类型检查 + 单元测试 + 构建；CI 见 `.github/workflows/ci.yml`
 - `plugin/manifest.json` 的 `devTools` 现为 `false`。开发调试时临时改成 `true` 可弹出开发者工具（控制台可 `location.reload()`）；不开 DevTools 时，用 Eagle 工具栏「插件 → 开发」标签里该插件右侧「…」菜单的「重新加载」，并改完 manifest 后需重新加载才生效
 
 ## 工作约定

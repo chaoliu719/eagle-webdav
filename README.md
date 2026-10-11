@@ -18,7 +18,9 @@ npm install
 npm run build
 ```
 
-开发时：在 Eagle 菜单「插件 → 开发者选项… → 导入本地项目」里选 `plugin/` 目录。正式安装：`npm run package` 生成 `dist/eagle-webdav-<版本>.eagleplugin`（和 Eagle「打包插件」的产物同样是 plugin/ 内容的 zip）以及同内容的 `.zip`，解压后用「导入本地项目」加载。
+开发时：在 Eagle 菜单「插件 → 开发者选项… → 导入本地项目」里选 `plugin/` 目录。
+
+正式安装：`npm run package` 生成 `dist/eagle-webdav-<版本>.eagleplugin`（与 Eagle「打包插件」的产物一样，是 plugin/ 内容的 zip），双击它，在 Eagle 弹出的「Install …?」里点 Install；服务会立即自启。同内容的 `.zip` 也一并生成。
 
 首次打开插件窗口，选监听地址、端口，设置账号和密码后点「启动」。监听非本机地址前必须先设置密码。配置保存在 `~/Library/Application Support/Eagle/eagle-webdav/config.json`。
 

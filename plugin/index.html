@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eagle WebDAV</title>
+<style>
+  :root { color-scheme: light dark; --bg:#fff; --fg:#1d1d1f; --mut:#6e6e73; --line:#d2d2d7; --card:#f5f5f7; --acc:#0a64d6; --bad:#c62828; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1c1c1e; --fg:#f2f2f7; --mut:#9a9aa0; --line:#3a3a3c; --card:#2c2c2e; --acc:#4da3ff; --bad:#ff6b6b; } }
+  html, body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.55 -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; }
+  body { padding:16px 18px 32px; }
+  h1 { font-size:17px; margin:0 0 4px; }
+  h2 { font-size:14px; margin:20px 0 6px; padding-top:12px; border-top:1px solid var(--line); }
+  .mut { color:var(--mut); margin:2px 0 8px; }
+  .warn { color:var(--bad); }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:6px 0; }
+  label { display:inline-flex; gap:6px; align-items:center; }
+  input, select { background:var(--card); color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:4px 8px; font:inherit; }
+  input[type=number] { width:80px; }
+  button { background:var(--acc); color:#fff; border:0; border-radius:6px; padding:5px 12px; font:inherit; cursor:pointer; }
+  button.sec { background:var(--card); color:var(--fg); border:1px solid var(--line); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  pre { background:var(--card); border:1px solid var(--line); border-radius:6px; padding:8px; font:12px/1.5 ui-monospace, Menlo, monospace; max-height:180px; overflow:auto; white-space:pre-wrap; word-break:break-all; margin:0; }
+</style>
+</head>
+<body>
+<h1>Eagle WebDAV</h1>
+<p class="mut" id="status">加载中…</p>
+
+<div class="row">
+  <label>监听地址 <select id="host"></select></label>
+  <label>端口 <input type="number" id="port" min="1" max="65535"></label>
+</div>
+<div class="row">
+  <label>账号 <input type="text" id="user" size="10"></label>
+  <label>密码 <input type="password" id="pass" size="14"></label>
+</div>
+<p class="mut warn" id="hostWarn"></p>
+<div class="row"><button id="btnStart">启动</button><button id="btnStop" class="sec" disabled>停止</button></div>
+<p class="mut" id="urls"></p>
+
+<h2>最近请求</h2>
+<pre id="reqlog">（尚无请求）</pre>
+<h2>日志</h2>
+<pre id="msglog"></pre>
+
+<script src="js/plugin.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "id": "EAGLEWEBDAV01",
+  "version": "0.1.0",
+  "platform": "all",
+  "arch": "all",
+  "name": "Eagle WebDAV",
+  "logo": "/logo.png",
+  "keywords": ["webdav", "finder", "rclone", "infuse"],
+  "devTools": true,
+  "main": {
+    "serviceMode": true,
+    "url": "index.html",
+    "width": 640,
+    "height": 620,
+    "minWidth": 480,
+    "minHeight": 420,
+    "resizable": true,
+    "multiple": false,
+    "runAfterInstall": true
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "id": "EWPROBE000001",
+  "version": "0.1.4",
+  "platform": "all",
+  "arch": "all",
+  "name": "Eagle WebDAV 探针",
+  "logo": "/logo.png",
+  "keywords": ["webdav", "probe", "m0"],
+  "devTools": true,
+  "main": {
+    "serviceMode": true,
+    "url": "index.html",
+    "width": 760,
+    "height": 820,
+    "minWidth": 560,
+    "minHeight": 520,
+    "resizable": true,
+    "multiple": false,
+    "runAfterInstall": true
+  }
+}

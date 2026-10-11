@@ -123,7 +123,10 @@ export class DavServer {
       this.deps.logger.request({
         n, t: new Date(started).toISOString(), ip, method: req.method ?? '', url: req.url ?? '',
         status, ms: Date.now() - started,
-        ua: req.headers['user-agent'], depth: req.headers['depth'] as string | undefined, role
+        ua: req.headers['user-agent'], depth: req.headers['depth'] as string | undefined, role,
+        range: req.headers['range'] as string | undefined,
+        contentRange: res.getHeader('content-range') as string | undefined,
+        length: res.getHeader('content-length') === undefined ? undefined : String(res.getHeader('content-length'))
       });
     };
     res.on('finish', () => record(res.statusCode));

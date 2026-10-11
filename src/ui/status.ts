@@ -236,7 +236,7 @@ export class StatusView {
     }
 
     const lines = this.logger.recent(60).map((e) =>
-      `#${e.n} ${e.ip} ${e.method} ${decodeSafe(e.url)} → ${e.status} ${e.ms}ms${e.depth !== undefined ? ' Depth:' + e.depth : ''}`);
+      `#${e.n} ${e.ip} ${e.method} ${decodeSafe(e.url)} → ${e.status} ${e.ms}ms${e.depth !== undefined ? ' Depth:' + e.depth : ''}${e.range ? ' Range:' + e.range : ''}${e.contentRange ? ' → ' + e.contentRange : ''}${e.length && !e.contentRange ? ' len:' + e.length : ''}${e.ua ? ' [' + e.ua.slice(0, 40) + ']' : ' [无UA]'}`);
     $('reqlog').textContent = lines.length ? lines.join('\n') : '（尚无请求）';
     $('msglog').textContent = this.logger.messages().slice(-30).join('\n');
   }

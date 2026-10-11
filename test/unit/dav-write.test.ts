@@ -25,7 +25,7 @@ const A1 = fake.addFolder('A1', A.id);
 const logger = new RingLogger();
 const index = new LibraryIndex(fake);
 const router = new DavRouter(fake, index, logger, { maxPut: 1024 * 1024, tmpRoot: path.join(dir, 'put') });
-const server = new DavServer({ getConfig: () => store.get(), logger, handler: (a, b) => router.handle(a, b) });
+const server = new DavServer({ getConfig: () => store.get(), logger, handler: (a, b, r) => router.handle(a, b, r) });
 
 const AUTH = { Authorization: 'Basic ' + Buffer.from('u:p').toString('base64') };
 const enc = (p: string) => p.split('/').map((x) => encodeURIComponent(x)).join('/');

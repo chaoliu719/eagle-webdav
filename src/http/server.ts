@@ -3,13 +3,15 @@ import type { Socket } from 'net';
 import type { Config } from '../config/config';
 import type { Logger } from '../util/log';
 import { isAllowedAddress, isLoopbackHost } from './access';
-import { Authenticator } from './auth';
+import { Authenticator, type Role } from './auth';
 
 export interface ServerDeps {
   getConfig(): Config;
   logger: Logger;
   /** 通过认证后的请求处理器（DAV 路由）。 */
-  handler(req: http.IncomingMessage, res: http.ServerResponse): Promise<void>;
+  handler(req: http.IncomingMessage, res: http.ServerResponse, role: Role): Promise<void>;
+  /** 请求开始 / 结束的回调（防休眠等用）。 */
+  activity?: { begin(): void; end(): void };
   auth?: Authenticator;
 }
 
@@ -112,19 +114,24 @@ export class DavServer {
     const n = ++this.counter;
     const started = Date.now();
     let done = false;
+    let role: Role | undefined;
+    this.deps.activity?.begin();
     const record = (status: number | 'aborted') => {
       if (done) return;
       done = true;
+      this.deps.activity?.end();
       this.deps.logger.request({
         n, t: new Date(started).toISOString(), ip, method: req.method ?? '', url: req.url ?? '',
         status, ms: Date.now() - started,
-        ua: req.headers['user-agent'], depth: req.headers['depth'] as string | undefined
+        ua: req.headers['user-agent'], depth: req.headers['depth'] as string | undefined, role
       });
     };
     res.on('finish', () => record(res.statusCode));
     res.on('close', () => record('aborted'));
 
-    const verdict = this.auth.check(req.headers['authorization'], ip, cfg);
+    const login = this.auth.login(req.headers['authorization'], ip, cfg);
+    const verdict = login.result;
+    role = login.role;
     if (verdict === 'banned') {
       req.resume();
       return this.send(res, 403, { Connection: 'close' }, 'Forbidden');
@@ -143,7 +150,7 @@ export class DavServer {
       return this.send(res, 503, { 'Retry-After': '5' }, 'Service Unavailable');
     }
 
-    this.deps.handler(req, res).catch((err: Error) => {
+    this.deps.handler(req, res, role as Role).catch((err: Error) => {
       this.deps.logger.error(`处理 ${req.method} ${req.url} 失败：${err.message}`);
       if (!res.headersSent) this.send(res, 500, {}, 'Internal Server Error');
       else res.destroy();

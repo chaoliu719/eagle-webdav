@@ -17,6 +17,7 @@ interface EagleGlobal {
   app?: EagleApp;
   library: { info(): Promise<EagleLibraryInfo> };
   log?: { info(msg: string): void; warn(msg: string): void; error(msg: string): void; debug?(msg: string): void };
+  notification?: { show(options: { title?: string; description?: string; mute?: boolean; duration?: number }): void };
   onPluginCreate?(cb: (plugin: unknown) => void): void;
   onPluginRun?(cb: () => void): void;
   onPluginShow?(cb: () => void): void;

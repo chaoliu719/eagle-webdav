@@ -5,47 +5,84 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Eagle WebDAV</title>
 <style>
-  :root { color-scheme: light dark; --bg:#fff; --fg:#1d1d1f; --mut:#6e6e73; --line:#d2d2d7; --card:#f5f5f7; --acc:#0a64d6; --bad:#c62828; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#1c1c1e; --fg:#f2f2f7; --mut:#9a9aa0; --line:#3a3a3c; --card:#2c2c2e; --acc:#4da3ff; --bad:#ff6b6b; } }
+  :root { color-scheme: light dark; --bg:#fff; --fg:#1d1d1f; --mut:#6e6e73; --line:#d2d2d7; --card:#f5f5f7; --acc:#0a64d6; --bad:#c62828; --ok:#1b8a3a; --warnbg:#fff4d6; --warnfg:#7a5600; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1c1c1e; --fg:#f2f2f7; --mut:#9a9aa0; --line:#3a3a3c; --card:#2c2c2e; --acc:#4da3ff; --bad:#ff6b6b; --ok:#4cd27a; --warnbg:#4a3b10; --warnfg:#ffd479; } }
   html, body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.55 -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; }
   body { padding:16px 18px 32px; }
-  h1 { font-size:17px; margin:0 0 4px; }
-  h2 { font-size:14px; margin:20px 0 6px; padding-top:12px; border-top:1px solid var(--line); }
-  .mut { color:var(--mut); margin:2px 0 8px; }
+  h1 { font-size:17px; margin:0; display:flex; align-items:center; gap:10px; }
+  h2 { font-size:13px; margin:18px 0 6px; padding-top:12px; border-top:1px solid var(--line); }
+  .mut { color:var(--mut); margin:2px 0 6px; }
   .warn { color:var(--bad); }
+  .badge { font-size:11px; font-weight:500; padding:1px 8px; border-radius:10px; background:var(--card); color:var(--mut); }
+  .badge.on { background:var(--ok); color:#fff; }
   .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:6px 0; }
   label { display:inline-flex; gap:6px; align-items:center; }
   input, select { background:var(--card); color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:4px 8px; font:inherit; }
   input[type=number] { width:80px; }
+  input[type=checkbox] { padding:0; }
   button { background:var(--acc); color:#fff; border:0; border-radius:6px; padding:5px 12px; font:inherit; cursor:pointer; }
-  button.sec { background:var(--card); color:var(--fg); border:1px solid var(--line); }
+  button.sec { background:var(--card); color:var(--fg); border:1px solid var(--line); padding:2px 9px; }
   button:disabled { opacity:.45; cursor:not-allowed; }
-  pre { background:var(--card); border:1px solid var(--line); border-radius:6px; padding:8px; font:12px/1.5 ui-monospace, Menlo, monospace; max-height:180px; overflow:auto; white-space:pre-wrap; word-break:break-all; margin:0; }
+  code { background:var(--card); padding:1px 6px; border-radius:4px; user-select:all; }
+  .notice { background:var(--warnbg); color:var(--warnfg); border-radius:8px; padding:8px 12px; margin:10px 0 0; }
+  .addr { display:flex; align-items:center; gap:8px; margin:4px 0; }
+  .qr { display:flex; gap:14px; align-items:flex-start; margin-top:10px; }
+  .qr .box { background:#fff; padding:6px; border-radius:8px; line-height:0; }
+  .qr svg { width:132px; height:132px; }
+  table { border-collapse:collapse; width:100%; }
+  th, td { text-align:left; padding:3px 8px 3px 0; border-bottom:1px solid var(--line); }
+  th { color:var(--mut); font-weight:500; }
+  details { margin-top:14px; border-top:1px solid var(--line); padding-top:10px; }
+  summary { cursor:pointer; font-weight:600; }
+  pre { background:var(--card); border:1px solid var(--line); border-radius:6px; padding:8px; font:12px/1.5 ui-monospace, Menlo, monospace; max-height:170px; overflow:auto; white-space:pre-wrap; word-break:break-all; margin:6px 0 0; }
+  .grid { display:grid; grid-template-columns:auto 1fr; gap:6px 10px; align-items:center; }
 </style>
 </head>
 <body>
-<h1>Eagle WebDAV</h1>
+<h1>Eagle WebDAV <span class="badge" id="state">未启动</span></h1>
 <p class="mut" id="status">加载中…</p>
-
-<div class="row">
-  <label>监听地址 <select id="host"></select></label>
-  <label>端口 <input type="number" id="port" min="1" max="65535"></label>
-</div>
-<div class="row">
-  <label>账号 <input type="text" id="user" size="10"></label>
-  <label>密码 <input type="password" id="pass" size="14"></label>
-</div>
-<div class="row">
-  <label>额外允许的来源网段 <input type="text" id="cidrs" size="30" placeholder="如 100.64.0.0/10，多个用逗号分隔"></label>
-</div>
-<p class="mut warn" id="hostWarn"></p>
 <div class="row"><button id="btnStart">启动</button><button id="btnStop" class="sec" disabled>停止</button></div>
-<p class="mut" id="urls"></p>
+<div id="notices"></div>
 
-<h2>最近请求</h2>
-<pre id="reqlog">（尚无请求）</pre>
-<h2>日志</h2>
-<pre id="msglog"></pre>
+<h2>连接地址</h2>
+<div id="addrs"><span class="mut">服务未启动</span></div>
+<div class="qr" id="qrwrap" hidden>
+  <div class="box" id="qr"></div>
+  <div>
+    <p class="mut" style="margin-top:0">用 iPad / iPhone 扫码，得到上面的地址，再填账号密码。</p>
+    <label>二维码地址 <select id="qrsel"></select></label>
+  </div>
+</div>
+<p class="mut" id="discover"></p>
+<p class="mut" id="sleep"></p>
+
+<h2>最近连接的客户端</h2>
+<table id="clients"><tbody><tr><td class="mut">（尚无连接）</td></tr></tbody></table>
+
+<details id="settings">
+  <summary>设置</summary>
+  <div class="grid" style="margin-top:10px">
+    <span>监听地址</span><div><select id="host"></select> <span class="warn" id="hostWarn"></span></div>
+    <span>端口</span><div><input type="number" id="port" min="1" max="65535"></div>
+    <span>管理账号</span><div class="row" style="margin:0"><input type="text" id="user" size="10"> <input type="password" id="pass" size="16"></div>
+    <span>只读账号</span><div class="row" style="margin:0"><input type="text" id="rouser" size="10"> <input type="password" id="ropass" size="16"> <span class="mut">给电视、iPad 等只看不改的设备</span></div>
+    <span>额外允许的来源网段</span><div><input type="text" id="cidrs" size="34" placeholder="如 100.64.0.0/10，多个用逗号分隔"></div>
+    <span>选项</span><div class="row" style="margin:0">
+      <label><input type="checkbox" id="bonjour"> 自动发现（Bonjour）</label>
+      <label><input type="checkbox" id="nosleep"> 有连接时阻止休眠</label>
+    </div>
+  </div>
+  <p class="mut">修改设置后点「启动」（正在运行时先点「停止」）使其生效。密码留空表示不改。</p>
+</details>
+
+<details>
+  <summary>最近请求</summary>
+  <pre id="reqlog">（尚无请求）</pre>
+</details>
+<details>
+  <summary>日志</summary>
+  <pre id="msglog"></pre>
+</details>
 
 <script src="js/plugin.js"></script>
 </body>

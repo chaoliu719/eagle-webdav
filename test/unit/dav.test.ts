@@ -29,7 +29,7 @@ fake.addItem('loose', 'png', 'PNGDATA', []);
 const logger = new RingLogger();
 const index = new LibraryIndex(fake);
 const router = new DavRouter(fake, index, logger);
-const server = new DavServer({ getConfig: () => store.get(), logger, handler: (a, b) => router.handle(a, b) });
+const server = new DavServer({ getConfig: () => store.get(), logger, handler: (a, b, r) => router.handle(a, b, r) });
 
 const AUTH = { Authorization: 'Basic ' + Buffer.from('u:p').toString('base64') };
 function req(method: string, p: string, headers: http.OutgoingHttpHeaders = {}, body?: string) {

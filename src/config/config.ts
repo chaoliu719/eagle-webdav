@@ -15,6 +15,13 @@ export interface Config {
   tagsView: boolean;
   /** Eagle 启动后自动监听。 */
   autoStart: boolean;
+  /** 只读账号：只能读取，写入类方法一律 403，并以 DAV: 1 通告（Finder 会只读挂载）。 */
+  readonlyUsername: string;
+  readonlyPasswordHash: string | null;
+  /** 用 Bonjour（dns-sd）广播 _webdav._tcp，Finder「网络」与 Infuse 等能自动发现。仅 macOS。 */
+  bonjour: boolean;
+  /** 有客户端连接时阻止 Mac 休眠（caffeinate）。仅 macOS。 */
+  preventSleep: boolean;
 }
 
 export const DEFAULT_CONFIG: Config = {
@@ -24,7 +31,11 @@ export const DEFAULT_CONFIG: Config = {
   passwordHash: null,
   extraAllowedCidrs: [],
   tagsView: true,
-  autoStart: true
+  autoStart: true,
+  readonlyUsername: 'viewer',
+  readonlyPasswordHash: null,
+  bonjour: true,
+  preventSleep: true
 };
 
 const SCRYPT_N = 16384;
@@ -60,7 +71,11 @@ function sanitize(raw: unknown): Config {
     passwordHash: typeof r.passwordHash === 'string' && r.passwordHash ? r.passwordHash : null,
     extraAllowedCidrs: Array.isArray(r.extraAllowedCidrs) ? r.extraAllowedCidrs.filter((x): x is string => typeof x === 'string') : [],
     tagsView: typeof r.tagsView === 'boolean' ? r.tagsView : d.tagsView,
-    autoStart: typeof r.autoStart === 'boolean' ? r.autoStart : d.autoStart
+    autoStart: typeof r.autoStart === 'boolean' ? r.autoStart : d.autoStart,
+    readonlyUsername: typeof r.readonlyUsername === 'string' && r.readonlyUsername ? r.readonlyUsername : d.readonlyUsername,
+    readonlyPasswordHash: typeof r.readonlyPasswordHash === 'string' && r.readonlyPasswordHash ? r.readonlyPasswordHash : null,
+    bonjour: typeof r.bonjour === 'boolean' ? r.bonjour : d.bonjour,
+    preventSleep: typeof r.preventSleep === 'boolean' ? r.preventSleep : d.preventSleep
   };
 }
 
@@ -95,5 +110,9 @@ export class ConfigStore {
 
   setPassword(password: string): Config {
     return this.update({ passwordHash: hashPassword(password) });
+  }
+
+  setReadonlyPassword(password: string): Config {
+    return this.update({ readonlyPasswordHash: hashPassword(password) });
   }
 }

@@ -30,5 +30,5 @@ logger.onChange(() => {});
 const origRequest = logger.request.bind(logger);
 logger.request = (e) => { origRequest(e); console.log(`${e.method} ${decodeURIComponent(e.url)} -> ${e.status} ${e.ms}ms`); };
 const router = new DavRouter(fake, new LibraryIndex(fake), logger);
-const server = new DavServer({ getConfig: () => store.get(), logger, handler: (a, b) => router.handle(a, b) });
+const server = new DavServer({ getConfig: () => store.get(), logger, handler: (a, b, r) => router.handle(a, b, r) });
 server.start().then(() => console.log('ready on', port));

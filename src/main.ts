@@ -9,7 +9,9 @@ import { parseCidr } from './http/access';
 import { DavServer } from './http/server';
 import { LibraryIndex } from './index/libraryIndex';
 import { StatusView, lanAddresses } from './ui/status';
+import { Bonjour } from './util/bonjour';
 import { RingLogger } from './util/log';
+import { SleepGuard } from './util/sleepGuard';
 
 const logger = new RingLogger((level, msg) => {
   try { if (typeof eagle !== 'undefined') eagle?.log?.[level]?.('[webdav] ' + msg); } catch { /* ignore */ }
@@ -23,7 +25,16 @@ const adapter: EagleAdapter = new RealEagleAdapter();
 try { fs.rmSync(path.join(os.tmpdir(), 'eagle-webdav'), { recursive: true, force: true }); } catch { /* ignore */ }
 const index = new LibraryIndex(adapter);
 const router = new DavRouter(adapter, index, logger, { tagsView: () => store.get().tagsView });
-const server = new DavServer({ getConfig: () => store.get(), logger, handler: (req, res) => router.handle(req, res) });
+const sleepGuard = new SleepGuard({ enabled: () => store.get().preventSleep });
+const bonjour = new Bonjour();
+const server = new DavServer({
+  getConfig: () => store.get(), logger, handler: (req, res, role) => router.handle(req, res, role),
+  activity: { begin: () => sleepGuard.begin(), end: () => sleepGuard.end() }
+});
+// 需要用户注意的事（如 Eagle 在等「重复添加提示」确认）同时用 Eagle 自带的通知提醒一次
+logger.onNotice = (n) => {
+  try { eagle?.notification?.show({ title: 'Eagle WebDAV', description: n.message }); } catch { /* ignore */ }
+};
 const view = new StatusView(logger);
 
 function urlsFor(host: string, port: number): string[] {
@@ -44,6 +55,10 @@ async function start(): Promise<void> {
     const info = await server.start();
     const lib = await adapter.libraryInfo().catch(() => null);
     view.setRunning(true, urlsFor(info.host, info.port));
+    // 只在对局域网开放时才广播；仅本机监听没有意义
+    const cfg = store.get();
+    const discoverable = cfg.bonjour && info.host !== '127.0.0.1' && info.host !== '::1';
+    view.setDiscovery(discoverable && bonjour.start(info.port) ? bonjour.name : null);
     if (adapter instanceof RealEagleAdapter) {
       adapter.diagnose().then((ls) => ls.forEach((l) => logger.info(l)), (e: Error) => logger.warn('形态自检失败：' + e.message));
     }
@@ -58,6 +73,9 @@ async function start(): Promise<void> {
 }
 
 async function stop(): Promise<void> {
+  bonjour.stop();
+  sleepGuard.release();
+  view.setDiscovery(null);
   await server.stop();
   view.setRunning(false);
   view.setStatus('已停止');
@@ -80,12 +98,27 @@ function init(): void {
 
   view.bind({
     onStart(form) {
+      if (form.readonlyUsername && form.readonlyUsername === form.username) {
+        view.setStatus('只读账号的用户名不能和管理账号相同', true);
+        return;
+      }
       if (form.password) store.setPassword(form.password);
-      store.update({ host: form.host, port: form.port, username: form.username, extraAllowedCidrs: form.cidrs.filter((c) => parseCidr(c) !== null) });
+      if (form.readonlyPassword) store.setReadonlyPassword(form.readonlyPassword);
+      store.update({
+        host: form.host, port: form.port, username: form.username,
+        readonlyUsername: form.readonlyUsername || 'viewer',
+        extraAllowedCidrs: form.cidrs.filter((c) => parseCidr(c) !== null),
+        bonjour: form.bonjour, preventSleep: form.preventSleep
+      });
       void start();
     },
     onStop() { void stop(); }
-  }, { host: cfg.host, port: cfg.port, username: cfg.username, hasPassword: !!cfg.passwordHash, cidrs: cfg.extraAllowedCidrs });
+  }, {
+    host: cfg.host, port: cfg.port, username: cfg.username, hasPassword: !!cfg.passwordHash,
+    readonlyUsername: cfg.readonlyUsername, hasReadonlyPassword: !!cfg.readonlyPasswordHash,
+    cidrs: cfg.extraAllowedCidrs, bonjour: cfg.bonjour, preventSleep: cfg.preventSleep
+  });
+  setInterval(() => view.setSleepState(sleepGuard.active, store.get().preventSleep), 2000);
   view.setStatus('已停止');
   view.renderLog(true);
 
@@ -109,7 +142,11 @@ function registerLifecycle(): void {
       server.setSwitching(false);
     }
   });
-  eagle.onPluginBeforeExit?.(() => { void server.stop().then(() => router.dispose()); });
+  eagle.onPluginBeforeExit?.(() => {
+    bonjour.stop();
+    sleepGuard.release();
+    void server.stop().then(() => router.dispose());
+  });
 }
 
 document.addEventListener('DOMContentLoaded', () => {

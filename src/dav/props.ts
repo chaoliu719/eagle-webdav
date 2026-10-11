@@ -1,0 +1,95 @@
+import type { ItemInfo } from '../eagle/adapter';
+import { mimeOfExt } from '../util/mime';
+import type { Entry } from '../vfs/naming';
+import type { Resolved } from '../vfs/resolver';
+import { activeLockXml, SUPPORTED_LOCK_XML, type LockManager } from './locks';
+import { escXml, hrefOf } from './path';
+import type { PropfindRequest } from './xml';
+
+export interface DavResource {
+  segs: string[];
+  isDir: boolean;
+  size: number;
+  mime: string;
+  modified: number;
+  created: number;
+  etag: string | null;
+}
+
+/** Eagle 的时间戳按毫秒；小于 1e11 的当作秒。 */
+function toMs(t: number): number {
+  if (!t) return 0;
+  return t < 1e11 ? t * 1000 : t;
+}
+
+export function etagOf(it: Pick<ItemInfo, 'id' | 'modifiedAt' | 'size'>): string {
+  return `"${it.id}-${it.modifiedAt}-${it.size}"`;
+}
+
+function itemResource(segs: string[], it: ItemInfo, fallback: number): DavResource {
+  return {
+    segs, isDir: false, size: it.size, mime: mimeOfExt(it.ext),
+    modified: toMs(it.modifiedAt) || fallback, created: toMs(it.importedAt) || toMs(it.modifiedAt) || fallback,
+    etag: etagOf(it)
+  };
+}
+
+export function resourceOfResolved(r: Resolved, fallback: number): DavResource {
+  if (r.kind === 'item') return itemResource(r.segs, r.item, fallback);
+  const created = r.kind === 'folder' ? toMs(r.folder.createdAt) || fallback : fallback;
+  return { segs: r.segs, isDir: true, size: 0, mime: 'httpd/unix-directory', modified: created, created, etag: null };
+}
+
+export function resourceOfEntry(parentSegs: string[], e: Entry, fallback: number): DavResource {
+  const segs = [...parentSegs, e.name];
+  if (e.item) return itemResource(segs, e.item, fallback);
+  const created = toMs(e.folder?.createdAt ?? 0) || fallback;
+  return { segs, isDir: true, size: 0, mime: 'httpd/unix-directory', modified: created, created, etag: null };
+}
+
+/** 创建时间：RFC 3339，UTC，不带毫秒（与 Go webdav 对齐）。 */
+function iso(ms: number): string { return new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z'); }
+
+const ALL_PROPS = ['resourcetype', 'getcontentlength', 'getcontenttype', 'getlastmodified', 'creationdate', 'getetag', 'displayname', 'supportedlock', 'lockdiscovery'];
+
+function displayName(r: DavResource): string {
+  return r.segs.length ? r.segs[r.segs.length - 1] : '';
+}
+
+function propValue(name: string, r: DavResource, locks: LockManager): string | null {
+  switch (name) {
+    case 'resourcetype': return r.isDir ? '<D:resourcetype><D:collection/></D:resourcetype>' : '<D:resourcetype/>';
+    case 'getcontentlength': return r.isDir ? null : `<D:getcontentlength>${r.size}</D:getcontentlength>`;
+    case 'getcontenttype': return r.isDir ? null : `<D:getcontenttype>${escXml(r.mime)}</D:getcontenttype>`;
+    case 'getlastmodified': return `<D:getlastmodified>${new Date(r.modified).toUTCString()}</D:getlastmodified>`;
+    case 'creationdate': return `<D:creationdate>${iso(r.created)}</D:creationdate>`;
+    case 'getetag': return r.etag ? `<D:getetag>${escXml(r.etag)}</D:getetag>` : null;
+    case 'displayname': return `<D:displayname>${escXml(displayName(r))}</D:displayname>`;
+    case 'supportedlock': return SUPPORTED_LOCK_XML;
+    case 'lockdiscovery': return `<D:lockdiscovery>${locks.covering(r.segs).map(activeLockXml).join('')}</D:lockdiscovery>`;
+  }
+  return null;
+}
+
+export function responseXml(r: DavResource, req: PropfindRequest, locks: LockManager): string {
+  const ok: string[] = [];
+  const missing: string[] = [];
+  if (req.mode === 'propname') {
+    for (const k of ALL_PROPS) if (propValue(k, r, locks) !== null) ok.push(`<D:${k}/>`);
+  } else if (req.mode === 'allprop') {
+    for (const k of ALL_PROPS) { const v = propValue(k, r, locks); if (v !== null) ok.push(v); }
+  } else {
+    for (const w of req.props) {
+      const v = w.ns === 'DAV:' ? propValue(w.name, r, locks) : null;
+      if (v !== null) ok.push(v);
+      else if (w.ns && w.ns !== 'DAV:') missing.push(`<ns0:${w.name} xmlns:ns0="${escXml(w.ns)}"/>`);
+      else if (w.ns === 'DAV:') missing.push(`<D:${w.name}/>`);
+      else missing.push(`<${w.prefix ? w.prefix + ':' : ''}${w.name}/>`);
+    }
+  }
+  let x = `<D:response><D:href>${escXml(hrefOf(r.segs, r.isDir))}</D:href>`;
+  if (ok.length) x += `<D:propstat><D:prop>${ok.join('')}</D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat>`;
+  if (missing.length) x += `<D:propstat><D:prop>${missing.join('')}</D:prop><D:status>HTTP/1.1 404 Not Found</D:status></D:propstat>`;
+  if (!ok.length && !missing.length) x += '<D:propstat><D:prop/><D:status>HTTP/1.1 200 OK</D:status></D:propstat>';
+  return x + '</D:response>';
+}

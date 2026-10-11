@@ -3,7 +3,9 @@ import * as path from 'path';
 import { ConfigStore } from './config/config';
 import { MIN_BUILD, type EagleAdapter } from './eagle/adapter';
 import { RealEagleAdapter, userDataDir } from './eagle/realAdapter';
+import { DavRouter } from './dav/router';
 import { DavServer } from './http/server';
+import { LibraryIndex } from './index/libraryIndex';
 import { StatusView, lanAddresses } from './ui/status';
 import { RingLogger } from './util/log';
 
@@ -15,7 +17,9 @@ const logger = new RingLogger((level, msg) => {
 let configDir = '';
 let store = new ConfigStore(path.join(os.homedir(), '.eagle-webdav', 'eagle-webdav'));
 const adapter: EagleAdapter = new RealEagleAdapter();
-const server = new DavServer({ getConfig: () => store.get(), logger });
+const index = new LibraryIndex(adapter);
+const router = new DavRouter(adapter, index, logger);
+const server = new DavServer({ getConfig: () => store.get(), logger, handler: (req, res) => router.handle(req, res) });
 const view = new StatusView(logger);
 
 function urlsFor(host: string, port: number): string[] {
@@ -36,6 +40,9 @@ async function start(): Promise<void> {
     const info = await server.start();
     const lib = await adapter.libraryInfo().catch(() => null);
     view.setRunning(true, urlsFor(info.host, info.port));
+    if (adapter instanceof RealEagleAdapter) {
+      adapter.diagnose().then((ls) => ls.forEach((l) => logger.info(l)), (e: Error) => logger.warn('形态自检失败：' + e.message));
+    }
     view.setStatus(`运行中 · ${lib ? '资源库：' + lib.name : ''}`);
   } catch (e) {
     const err = e as NodeJS.ErrnoException;
@@ -88,7 +95,8 @@ function registerLifecycle(): void {
     server.setSwitching(true);
     view.setStatus('资源库切换中…');
     try {
-      // M1 没有缓存可清；后续里程碑在此重建文件夹树、清空锁与影子条目
+      // 清空索引缓存；后续里程碑在此一并清理锁与影子条目
+      index.invalidate();
       const lib = await adapter.libraryInfo();
       view.setStatus(`运行中 · 资源库：${lib.name}`);
     } catch (e) {

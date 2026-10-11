@@ -8,6 +8,8 @@ import { Authenticator } from './auth';
 export interface ServerDeps {
   getConfig(): Config;
   logger: Logger;
+  /** 通过认证后的请求处理器（DAV 路由）。 */
+  handler(req: http.IncomingMessage, res: http.ServerResponse): Promise<void>;
   auth?: Authenticator;
 }
 
@@ -22,7 +24,7 @@ const SERVER_NAME = 'EagleWebdav/0.1';
 
 /**
  * HTTP 层：源地址过滤 → Basic 认证 → 方法分发。
- * M1 只实现 OPTIONS，其余方法返回 501，由后续里程碑接入 DAV 路由。
+ * 方法处理交给 deps.handler（DavRouter）。
  */
 export class DavServer {
   private servers: http.Server[] = [];
@@ -141,27 +143,11 @@ export class DavServer {
       return this.send(res, 503, { 'Retry-After': '5' }, 'Service Unavailable');
     }
 
-    try {
-      this.dispatch(req, res);
-    } catch (err) {
-      this.deps.logger.error(`处理 ${req.method} 失败：${(err as Error).message}`);
+    this.deps.handler(req, res).catch((err: Error) => {
+      this.deps.logger.error(`处理 ${req.method} ${req.url} 失败：${err.message}`);
       if (!res.headersSent) this.send(res, 500, {}, 'Internal Server Error');
-      else res.end();
-    }
-  }
-
-  private dispatch(req: http.IncomingMessage, res: http.ServerResponse): void {
-    if (req.method === 'OPTIONS') {
-      req.resume();
-      // TODO(M2)：Allow 头按资源类型给出，这里先按集合处理
-      return this.send(res, 200, {
-        DAV: '1, 2',
-        Allow: 'OPTIONS, LOCK, DELETE, PROPPATCH, COPY, MOVE, UNLOCK, PROPFIND',
-        'MS-Author-Via': 'DAV'
-      });
-    }
-    req.resume();
-    this.send(res, 501, {}, 'Not Implemented');
+      else res.destroy();
+    });
   }
 
   private send(res: http.ServerResponse, status: number, headers: http.OutgoingHttpHeaders = {}, body = ''): void {

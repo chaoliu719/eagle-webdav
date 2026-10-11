@@ -44,7 +44,7 @@ PUT 先写影子暂存区，`addFromPath` 加 20s 超时；超时返回 `415` �
 ## 里程碑
 - M0 探针：已完成（`probe/`），遗留项见下
 - M1 骨架：已完成并真机验证（Eagle 内启动、OPTIONS、Basic 认证、局域网访问均正常）。已有：配置与 scrypt 密码、源地址过滤、Basic 认证与封禁、OPTIONS、资源库切换 503、状态窗口、EagleAdapter 接口与 Fake
-- M2 只读：PROPFIND、GET/HEAD（含 Range），用 Finder 和 rclone 验证
+- M2 只读：代码与单元测试已完成，待真机验证（Finder、rclone）。已有：PROPFIND（Depth 0/1，流式输出）、GET/HEAD（Range、条件请求、库内路径校验）、假 LOCK/UNLOCK（Finder 读取也要锁）、目录名消歧、索引缓存（按 `library.info().modificationTime` 失效）。**未做**：`@标签` 视图（需先确认标签列表 API）
 - M3 写入：PUT、MKCOL、DELETE、MOVE、COPY、PROPPATCH、LOCK/UNLOCK
 - M4 变更监听、性能、大库测试
 
@@ -58,5 +58,6 @@ NFC/NFD 文件名、`replaceFile` 换扩展名、跨设备 LAN、完整 R2（关
 - 在真机验证前，不要假设 Eagle API 存在某方法；先查本文件的实测事实
 - 构建与测试：`npm run build`、`npm run typecheck`、`npm test`（tsx + node:test，`test/unit/`）
 - 脚本加载瞬间 `eagle.app` 的 version、build、userDataPath 读不到（曾显示 Build 0），初始化要等 `onPluginCreate`，build 读不到时不拦截启动
+- M2 对 Eagle 形态的假设（真机未核对，启动日志里有「形态自检」输出可对照）：`folder.getAll()` 可能是扁平也可能是树，适配层两种都兼容；Folder 的 `createdAt` 字段名未确认（回退 `modificationTime`，再回退 0）；`item.get({folders:[id]})` 视为只返回直属条目；未分类 = 取全库再过滤 `folders.length === 0`（大库慢，需 M4 优化）；`item.get` 的 `fields` 参数含 importedAt 未确认，失败时自动退回不带 fields
 - 源码：`src/{config,http,eagle,util,ui}`；只有 `src/eagle/realAdapter.ts` 可直接碰全局 `eagle`；`eagle.app.userDataPath` 未实测，缺失时回退到 `~/.eagle-webdav`
 - 探针测试：`node probe/test/selftest.js`；与 rclone 对照：`probe/test/compare.sh`

@@ -18,7 +18,7 @@ export interface Config {
   /** 只读账号：只能读取，写入类方法一律 403，并以 DAV: 1 通告（Finder 会只读挂载）。 */
   readonlyUsername: string;
   readonlyPasswordHash: string | null;
-  /** 用 Bonjour（dns-sd）广播 _webdav._tcp，Finder「网络」与 Infuse 等能自动发现。仅 macOS。 */
+  /** 用 Bonjour（dns-sd）广播 _webdav._tcp，Infuse 等 App 能自动发现（Finder 的「网络」不会列出 WebDAV，实测）。仅 macOS。 */
   bonjour: boolean;
   /** 有客户端连接时阻止 Mac 休眠（caffeinate）。仅 macOS。 */
   preventSleep: boolean;

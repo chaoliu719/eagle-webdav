@@ -3,7 +3,7 @@ import * as os from 'os';
 
 type Spawn = (cmd: string, args: string[]) => ChildProcess;
 
-/** 用系统自带的 dns-sd 注册 _webdav._tcp 服务，Finder「网络」与 Infuse 等可自动发现。仅 macOS。 */
+/** 用系统自带的 dns-sd 注册 _webdav._tcp 服务，Infuse 等 App 可自动发现（Finder 的「网络」不会列出 WebDAV，实测）。仅 macOS。 */
 export class Bonjour {
   private child: ChildProcess | null = null;
   name = '';

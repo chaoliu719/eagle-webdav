@@ -54,7 +54,7 @@ PUT 先写影子暂存区，`addFromPath` 加 20s 超时；超时返回 `415` �
 
 ## 体验增强（已真机验证）
 - 状态窗口：连接地址一键复制、二维码（`qrcode-generator`，已用系统识别验证能扫出正确地址）、最近连接的客户端（按 User-Agent 识别 Finder / Infuse / rclone 等）、提示横幅（可「忽略」）。`198.18.0.0/15`（Surge 虚拟网卡）不列入连接地址
-- Bonjour：`dns-sd -R "Eagle WebDAV (主机名)" _webdav._tcp local <端口>`，仅对局域网开放时注册；子进程在页面 `pagehide`、停止、退出时结束，启动时 `pkill -f 'dns-sd -R Eagle WebDAV'` 清理上次遗留
+- Bonjour：Infuse 的发现列表里能看到（真机确认），**Finder 的「网络」不会列出 `_webdav._tcp`（真机确认），Finder 仍须 ⌘K 手输地址**；`dns-sd -R "Eagle WebDAV (主机名)" _webdav._tcp local <端口>`，仅对局域网开放时注册；子进程在页面 `pagehide`、停止、退出时结束，启动时 `pkill -f 'dns-sd -R Eagle WebDAV'` 清理上次遗留
 - 防休眠：有请求时起 `caffeinate -i -w <进程号>`，空闲 60s 结束（`-w` 保证宿主进程退出后它也退出）
 - 只读账号（默认用户名 `viewer`）：写入类方法 403，`OPTIONS` 以 `DAV: 1` 通告（Finder 只读挂载），LOCK 不存在的路径 403
 - 重复添加提示：`importAt` 后按**目录列表**确认条目是否出现（`getById` 在弹提示时就已能返回条目，不能用来判断）；没出现就给横幅并用 `eagle.notification.show` 通知，后台每 5s 轮询，入库后自动撤销，10 分钟放弃。实测 Eagle 把多个重复提示合并处理时可能丢掉后面的导入

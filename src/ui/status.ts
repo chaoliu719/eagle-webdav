@@ -149,7 +149,7 @@ export class StatusView {
 
   setDiscovery(name: string | null): void {
     $('discover').textContent = name
-      ? `自动发现已开启：Finder 的「网络」、Infuse 等里会出现「${name}」。`
+      ? `自动发现已开启：Infuse 等 App 的 WebDAV 发现列表里会出现「${name}」。Finder 不会列出，请用 ⌘K 输入地址。`
       : '自动发现未开启。';
   }
 

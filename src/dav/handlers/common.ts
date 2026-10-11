@@ -43,6 +43,13 @@ export async function importAt(ctx: DavContext, file: string, name: string, fold
   try {
     const id = await ctx.adapter.importFile(file, { name: base, folders: folderId === null ? [] : [folderId] });
     ctx.index.invalidate();
+    // 实测：内容与库内已有文件相同时 Eagle 立即返回 id，但会弹「重复添加提示」，等人确认后才真正入库
+    let landed = false;
+    for (let i = 0; i < 5 && !landed; i++) {
+      landed = (await ctx.adapter.getItemFile(id).catch(() => null)) !== null;
+      if (!landed) await new Promise((r) => setTimeout(r, 300));
+    }
+    if (!landed) ctx.logger.warn(`导入 ${name} 尚未入库：Eagle 可能在等待「重复添加提示」的确认`);
     return { ok: true, id };
   } catch (e) {
     if (e instanceof ImportTimeoutError) return { ok: false, status: 415, message: 'Eagle 无法识别该文件格式（导入超时）' };

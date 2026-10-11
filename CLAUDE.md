@@ -45,7 +45,7 @@ PUT 先写影子暂存区，`addFromPath` 加 20s 超时；超时返回 `415` �
 - M0 探针：已完成（`probe/`），遗留项见下
 - M1 骨架：已完成并真机验证（Eagle 内启动、OPTIONS、Basic 认证、局域网访问均正常）。已有：配置与 scrypt 密码、源地址过滤、Basic 认证与封禁、OPTIONS、资源库切换 503、状态窗口、EagleAdapter 接口与 Fake
 - M2 只读：已完成并真机验证（Production 库 47 个条目：rclone lsd/ls/copy/check 全部一致，Finder 同款挂载 ls/cp/cmp 正常，列目录约 0.6s，拷贝 0.05s）。**未做**：`@标签` 视图（需先确认标签列表 API）；Finder 手动操作写入留到 M3
-- M3 写入：PUT、MKCOL、DELETE、MOVE、COPY、PROPPATCH、LOCK/UNLOCK
+- M3 写入：已完成并真机验证（Production 库，`node test/dev/real-write-smoke.mjs <端口> [密码]` 41 项全部通过；挂载点上 `mkdir/cp/mv/覆盖/rm -f` 均正常）。实现：PUT（新建 addFromPath、覆盖 replaceFile、0 字节占位与系统文件进影子暂存区）、MKCOL、DELETE（条目进回收站，文件夹 403）、MOVE/COPY（条目改名与归属增量修改、同名跨目录按引用、改名真复制并带 tags/star/annotation/url、文件夹改名与移动）、PROPPATCH（E 命名空间 tags/star/annotation/url、原子性、dead 属性存内存）。**未实测**：覆盖时换扩展名（现返回 403）、不识别的扩展名导入（可能弹 Eagle 对话框）、Finder 图形界面里的拖拽拷贝、Infuse/iPad
 - M4 变更监听、性能、大库测试
 
 ## M0 遗留（可边做边验）
@@ -59,6 +59,8 @@ NFC/NFD 文件名、`replaceFile` 换扩展名、跨设备 LAN、完整 R2（关
 - 构建与测试：`npm run build`、`npm run typecheck`、`npm test`（tsx + node:test，`test/unit/`）
 - 脚本加载瞬间 `eagle.app` 的 version、build、userDataPath 读不到（曾显示 Build 0），初始化要等 `onPluginCreate`，build 读不到时不拦截启动
 - 真机核对结果（Eagle 4.0.0 Build 23）：`eagle.app.userDataPath` 存在（`~/Library/Application Support/Eagle`，配置放其下 `eagle-webdav/`），但要等 `onPluginCreate`；`folder.getAll()` 返回的元素带 `children`，Folder 成员有 `createdAt`、`parent`、`children`、`description`、`icon`、`iconColor`；Item 成员还有 `palettes`、`comments`、`metadataFilePath`、`noThumbnail`、`noPreview`；**`item.get` 带 `fields` 时 `importedAt` / `modifiedAt` 会变成 0**（`getById` 与不带 fields 的 `get` 才是真值，毫秒时间戳），所以列表不用 fields；`item.get({folders:[id]})` 按直属条目工作正常；未分类 = 取全库再过滤（大库慢，M4 优化）
+- M3 真机实测：PUT 新建约 40ms；`replaceFile` 后 size 与 modifiedAt 更新、ETag 随之变化；改 `item.name` + `save()` 真实重命名磁盘文件；`item.folders` 增量改写生效；`moveToTrash` 后条目从所有文件夹消失。**内容与库内已有文件相同的导入（含 COPY 改名的真复制）会弹「重复添加提示」，导入要等人点确认才真正入库，`addFromPath` 却立即返回 id**——服务返回 201，但条目暂不可见，日志会警告；无法自动化绕过。`createFolder` 没有对应的删除 API，测试留下的 `__webdav_test_*` 文件夹需手动删除
+- 端口：本机 41600 常被 M0 探针插件的抓包服务占用（响应头 `EagleWebdavProbe/0.1`），M3 联调把配置里的端口改成了 41610（`~/Library/Application Support/Eagle/eagle-webdav/config.json`）；正式使用前要先停掉探针插件
 - 联调：不依赖 Eagle 用 `npx tsx test/dev/fake-server.ts` 起假数据服务；命令行 `mount_webdav` 带 URL 凭据会返回 22，改用 `osascript -e 'mount volume "http://127.0.0.1:41600/" as user name "eagle" with password "..."'`（走 NetFS，与 Finder 一致）；重载插件页面可在其 DevTools 控制台执行 `location.reload()`（屏幕锁定时 GUI 操作不可用）
 - 源码：`src/{config,http,eagle,util,ui}`；只有 `src/eagle/realAdapter.ts` 可直接碰全局 `eagle`；`eagle.app.userDataPath` 未实测，缺失时回退到 `~/.eagle-webdav`
 - 探针测试：`node probe/test/selftest.js`；与 rclone 对照：`probe/test/compare.sh`

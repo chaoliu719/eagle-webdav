@@ -4,7 +4,7 @@ import { readBody, send, sendXml } from '../../http/respond';
 import { isTagsView, pathKey } from '../../vfs/resolver';
 import type { DavContext } from '../context';
 import { escXml, hrefOf } from '../path';
-import { hasDoctype, nsMap } from '../xml';
+import { hasDoctype, isWellFormed, nsMap } from '../xml';
 
 export const EAGLE_NS = 'urn:eagle-webdav:ns';
 const MAX_XML_BODY = 1024 * 1024;
@@ -14,20 +14,20 @@ interface Instruction { op: 'set' | 'remove'; ns: string | null; name: string; p
 function parseInstructions(body: string): Instruction[] {
   const map = nsMap(body);
   const out: Instruction[] = [];
-  for (const op of ['set', 'remove'] as const) {
-    const blockRe = new RegExp(`<(?:[A-Za-z0-9_.-]+:)?${op}(?:\\s[^>]*)?>([\\s\\S]*?)</(?:[A-Za-z0-9_.-]+:)?${op}\\s*>`, 'g');
-    let b: RegExpExecArray | null;
-    while ((b = blockRe.exec(body))) {
-      const pm = /<(?:[A-Za-z0-9_.-]+:)?prop(?:\s[^>]*)?>([\s\S]*?)<\/(?:[A-Za-z0-9_.-]+:)?prop\s*>/.exec(b[1]);
-      if (!pm) continue;
-      const elRe = /<(?:([A-Za-z0-9_.-]+):)?([A-Za-z0-9_.-]+)((?:\s[^>]*?)?)(?:\/>|>([\s\S]*?)<\/(?:[A-Za-z0-9_.-]+:)?\2\s*>)/g;
-      let e: RegExpExecArray | null;
-      while ((e = elRe.exec(pm[1]))) {
-        const prefix = e[1] || '';
-        const own = nsMap(e[3] || '');
-        const ns = Object.prototype.hasOwnProperty.call(own, prefix) ? own[prefix] : map[prefix];
-        out.push({ op, ns: ns === undefined ? null : ns, name: e[2], prefix, value: (e[4] ?? '').trim() });
-      }
+  // 单次扫描，保持文档顺序：同一请求里的 remove 与 set 按先后依次生效
+  const blockRe = /<(?:[A-Za-z0-9_.-]+:)?(set|remove)(?:\s[^>]*)?>([\s\S]*?)<\/(?:[A-Za-z0-9_.-]+:)?\1\s*>/g;
+  let b: RegExpExecArray | null;
+  while ((b = blockRe.exec(body))) {
+    const op = b[1] as 'set' | 'remove';
+    const pm = /<(?:[A-Za-z0-9_.-]+:)?prop(?:\s[^>]*)?>([\s\S]*?)<\/(?:[A-Za-z0-9_.-]+:)?prop\s*>/.exec(b[2]);
+    if (!pm) continue;
+    const elRe = /<(?:([A-Za-z0-9_.-]+):)?([A-Za-z0-9_.-]+)((?:\s[^>]*?)?)(?:\/>|>([\s\S]*?)<\/(?:[A-Za-z0-9_.-]+:)?\2\s*>)/g;
+    let e: RegExpExecArray | null;
+    while ((e = elRe.exec(pm[1]))) {
+      const prefix = e[1] || '';
+      const own = nsMap(e[3] || '');
+      const ns = Object.prototype.hasOwnProperty.call(own, prefix) ? own[prefix] : map[prefix];
+      out.push({ op, ns: ns || null, name: e[2], prefix, value: (e[4] ?? '').trim() });
     }
   }
   return out;
@@ -48,6 +48,7 @@ type Verdict = { status: number } & ({ patch?: Partial<ItemPatch>; description?:
 export async function handleProppatch(ctx: DavContext, req: http.IncomingMessage, res: http.ServerResponse, segs: string[]): Promise<void> {
   const body = (await readBody(req, MAX_XML_BODY)).toString('utf8');
   if (hasDoctype(body)) return send(res, 400, {}, 'DOCTYPE not allowed');
+  if (!isWellFormed(body)) return send(res, 400, {}, '请求体不是格式良好的 XML');
   const r = await ctx.resolver.resolve(segs);
   if (!r) return send(res, 404, {}, 'Not Found');
   if (isTagsView(r)) return send(res, 403, {}, '「@标签」视图只读');
@@ -106,10 +107,11 @@ export async function handleProppatch(ctx: DavContext, req: http.IncomingMessage
     }
     const key = pathKey(r.segs);
     instrs.forEach((i, n) => {
-      if (!verdicts[n].dead || !i.ns) return;
+      if (!verdicts[n].dead) return;
       const m = ctx.deadProps.get(key) ?? new Map();
-      if (i.op === 'set') m.set(`${i.ns}|${i.name}`, { ns: i.ns, name: i.name, value: i.value });
-      else m.delete(`${i.ns}|${i.name}`);
+      const k = `${i.ns ?? ''}|${i.name}`;
+      if (i.op === 'set') m.set(k, { ns: i.ns ?? '', name: i.name, value: i.value });
+      else m.delete(k);
       if (m.size) ctx.deadProps.set(key, m); else ctx.deadProps.delete(key);
     });
   }

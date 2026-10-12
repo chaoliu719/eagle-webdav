@@ -62,13 +62,32 @@ export async function handleTransfer(
     return send(res, 403, {}, '源与目标相同');
   }
 
+  // 成功响应发出之前就把 dead 属性处理好，客户端紧接着的 PROPFIND 才读得到
+  const writeHead = res.writeHead.bind(res) as (...a: unknown[]) => http.ServerResponse;
+  res.writeHead = ((status: number, ...rest: unknown[]) => {
+    if (status >= 200 && status < 300) carryDeadProps(ctx, pathKey(src.segs), pathKey(destSegs), isMove);
+    return writeHead(status, ...rest);
+  }) as typeof res.writeHead;
+
   switch (src.kind) {
-    case 'item': return transferItem(ctx, res, src, destParent, destName, dest, overwrite, isMove);
+    case 'item': await transferItem(ctx, res, src, destParent, destName, dest, overwrite, isMove); break;
     case 'folder':
       if (!isMove) return send(res, 403, {}, '不支持复制文件夹');
-      return moveFolder(ctx, res, src, destParent, destName, dest, overwrite);
-    case 'shadow': return transferShadow(ctx, res, src, destParent, destName, dest, overwrite, isMove);
+      await moveFolder(ctx, res, src, destParent, destName, dest, overwrite);
+      break;
+    case 'shadow': await transferShadow(ctx, res, src, destParent, destName, dest, overwrite, isMove); break;
     default: return send(res, 403, {}, '不能移动或复制虚拟目录');
+  }
+}
+
+/** dead 属性跟着资源走：目标原有的先清掉，MOVE 搬走、COPY 复制（含子路径）。 */
+function carryDeadProps(ctx: DavContext, from: string, to: string, isMove: boolean): void {
+  const inTree = (k: string, root: string): boolean => k === root || k.startsWith(root + '/');
+  for (const k of [...ctx.deadProps.keys()]) if (inTree(k, to)) ctx.deadProps.delete(k);
+  for (const [k, v] of [...ctx.deadProps.entries()]) {
+    if (!inTree(k, from)) continue;
+    ctx.deadProps.set(to + k.slice(from.length), new Map(v));
+    if (isMove) ctx.deadProps.delete(k);
   }
 }
 

@@ -14,6 +14,7 @@ export async function handleDelete(ctx: DavContext, req: http.IncomingMessage, r
   switch (r.kind) {
     case 'shadow':
       ctx.shadow.remove(pathKey(r.segs));
+      ctx.deadProps.delete(pathKey(r.segs));
       return send(res, 204);
     case 'item': {
       const id = r.item.id;
@@ -25,6 +26,7 @@ export async function handleDelete(ctx: DavContext, req: http.IncomingMessage, r
         return send(res, 500, {}, '删除失败');
       }
       ctx.index.invalidate();
+      ctx.deadProps.delete(pathKey(r.segs));
       return send(res, 204);
     }
     default:

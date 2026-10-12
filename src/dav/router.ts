@@ -18,7 +18,7 @@ import { handleTransfer } from './handlers/transfer';
 import { activeLockXml, LockManager } from './locks';
 import { escXml, hrefOf, parseRequestPath } from './path';
 import { etagOf, resourceOfEntry, resourceOfResolved, responseXml } from './props';
-import { hasDoctype, parsePropfind } from './xml';
+import { hasDoctype, isWellFormed, parsePropfind } from './xml';
 import { safeLibraryFile } from './safeFile';
 import { serveFile } from './serve';
 
@@ -105,6 +105,7 @@ export class DavRouter {
   private async propfind(req: http.IncomingMessage, res: http.ServerResponse, segs: string[]): Promise<void> {
     const body = (await readBody(req, MAX_XML_BODY)).toString('utf8');
     if (hasDoctype(body)) return send(res, 400, {}, 'DOCTYPE not allowed');
+    if (body.trim() && !isWellFormed(body)) return send(res, 400, {}, '请求体不是格式良好的 XML');
     const depth = req.headers['depth'];
     if (depth === undefined || depth === 'infinity') {
       return sendXml(res, 403, '<D:error xmlns:D="DAV:"><D:propfind-finite-depth/></D:error>');

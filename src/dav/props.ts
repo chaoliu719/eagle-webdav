@@ -116,9 +116,11 @@ export function responseXml(r: DavResource, req: PropfindRequest, locks: LockMan
       let v: string | null = null;
       if (w.ns === 'DAV:') v = propValue(w.name, r, locks);
       else if (w.ns === EAGLE_NS) v = eagleProp(w.name, r);
-      else if (w.ns && dead?.has(`${w.ns}|${w.name}`)) {
-        const d = dead.get(`${w.ns}|${w.name}`) as DeadProp;
-        v = `<ns0:${w.name} xmlns:ns0="${escXml(d.ns)}">${d.value}</ns0:${w.name}>`;
+      else if (dead?.has(`${w.ns ?? ''}|${w.name}`)) {
+        const d = dead.get(`${w.ns ?? ''}|${w.name}`) as DeadProp;
+        v = d.ns
+          ? `<ns0:${w.name} xmlns:ns0="${escXml(d.ns)}">${d.value}</ns0:${w.name}>`
+          : `<${w.name} xmlns="">${d.value}</${w.name}>`;
       }
       if (v !== null) ok.push(v);
       else if (w.ns && w.ns !== 'DAV:') missing.push(`<ns0:${w.name} xmlns:ns0="${escXml(w.ns)}"/>`);

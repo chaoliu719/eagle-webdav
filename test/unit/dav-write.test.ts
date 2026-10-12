@@ -251,6 +251,36 @@ test('PROPPATCH：E 属性、原子性、dead 属性', async () => {
   assert.strictEqual((await req('PROPPATCH', '/A/nope.txt', {}, body('<D:set><D:prop><X:a>1</X:a></D:prop></D:set>'))).status, 404);
 });
 
+test('litmus 补丁：格式错误的 XML 返回 400、单引号命名空间、空命名空间、先删后设、dead 属性随 MOVE / COPY / DELETE', async () => {
+  fake.addItem('dp', 'txt', 'x', [A.id]);
+  index.invalidate();
+  const pf = (inner: string) => `<?xml version="1.0"?><propfind xmlns="DAV:"><prop>${inner}</prop></propfind>`;
+  const pp = (inner: string) => `<?xml version="1.0"?><propertyupdate xmlns="DAV:">${inner}</propertyupdate>`;
+  assert.strictEqual((await req('PROPFIND', '/A/dp.txt', { Depth: '0' }, '<foo>')).status, 400);
+  assert.strictEqual((await req('PROPFIND', '/A/dp.txt', { Depth: '0' }, '<D:propfind xmlns:D="DAV:"><D:prop><bar:foo xmlns:bar=""/></D:prop></D:propfind>')).status, 400);
+  assert.strictEqual((await req('PROPPATCH', '/A/dp.txt', {}, '<propertyupdate xmlns="DAV:">')).status, 400);
+
+  // 单引号 xmlns、xmlns=""、同一请求里 remove 后 set 取最后一个
+  let r = await req('PROPPATCH', '/A/dp.txt', {}, pp(
+    `<remove><prop><k xmlns='urn:q'/></prop></remove><set><prop><k xmlns='urn:q'>x</k></prop></set><set><prop><k xmlns='urn:q'>y</k></prop></set>` +
+    `<set><prop><plain xmlns="">v</plain></prop></set>`));
+  assert.strictEqual(r.status, 207);
+  r = await req('PROPFIND', '/A/dp.txt', { Depth: '0' }, pf(`<k xmlns='urn:q'/><plain xmlns=""/>`));
+  assert.ok(r.body.includes('>y</') && r.body.includes('>v</') && !r.body.includes('404'), r.body);
+
+  // MOVE 带走、COPY 复制、DELETE 清掉
+  assert.strictEqual((await req('MOVE', '/A/dp.txt', { Destination: 'http://127.0.0.1:' + PORT + enc('/A/dp2.txt') })).status, 201);
+  r = await req('PROPFIND', '/A/dp2.txt', { Depth: '0' }, pf(`<k xmlns="urn:q"/>`));
+  assert.ok(r.body.includes('>y</'), 'MOVE 后属性还在');
+  assert.strictEqual((await req('COPY', '/A/dp2.txt', { Destination: 'http://127.0.0.1:' + PORT + enc('/A/dp3.txt') })).status, 201);
+  r = await req('PROPFIND', '/A/dp3.txt', { Depth: '0' }, pf(`<k xmlns="urn:q"/>`));
+  assert.ok(r.body.includes('>y</'), 'COPY 后属性被复制');
+  assert.strictEqual((await req('DELETE', '/A/dp3.txt')).status, 204);
+  await req('PUT', '/A/dp3.txt', {}, 'again');
+  r = await req('PROPFIND', '/A/dp3.txt', { Depth: '0' }, pf(`<k xmlns="urn:q"/>`));
+  assert.ok(r.body.includes('404 Not Found'), '删除后重建的同名条目不应带着旧属性');
+});
+
 test('客户端上传中途断开：不入库，临时文件被清理', async () => {
   const before = fake.items.length;
   const putRoot = path.join(dir, 'put');

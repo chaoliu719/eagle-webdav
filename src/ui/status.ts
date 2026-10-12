@@ -52,6 +52,12 @@ export interface InitialSettings {
   preventSleep: boolean;
 }
 
+/**
+ * 已设置的密码用一串黑点表示（真实密码不会回显，这里只是占位值）。
+ * 用户点进去会全选，直接输入即替换；不改动则保存时视为「不修改」。
+ */
+const MASK = '•'.repeat(10);
+
 function ago(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));
   if (s < 5) return '刚刚';
@@ -86,6 +92,12 @@ export class StatusView {
       el.addEventListener('change', () => this.updateDirty());
     }
 
+    for (const id of ['pass', 'ropass']) {
+      const el = $<HTMLInputElement>(id);
+      // 点进去全选黑点，直接输入就是替换；清空后离开则恢复黑点（密码仍然存在）
+      el.addEventListener('focus', () => { if (el.value === MASK) el.select(); });
+      el.addEventListener('blur', () => { if (!el.value && el.dataset.isSet) el.value = MASK; });
+    }
     $('btnStart').addEventListener('click', () => handlers.onStart());
     $('btnStop').addEventListener('click', () => handlers.onStop());
     $('btnSave').addEventListener('click', () => handlers.onSave(this.readForm()));
@@ -97,11 +109,9 @@ export class StatusView {
     $<HTMLSelectElement>('host').value = s.host;
     $<HTMLInputElement>('port').value = String(s.port);
     $<HTMLInputElement>('user').value = s.username;
-    $<HTMLInputElement>('pass').value = '';
-    $<HTMLInputElement>('pass').placeholder = s.hasPassword ? '已设置，留空保持不变' : '未设置';
+    this.setPassword('pass', s.hasPassword, '未设置');
     $<HTMLInputElement>('rouser').value = s.readonlyUsername;
-    $<HTMLInputElement>('ropass').value = '';
-    $<HTMLInputElement>('ropass').placeholder = s.hasReadonlyPassword ? '已设置，留空保持不变' : '未启用';
+    this.setPassword('ropass', s.hasReadonlyPassword, '未启用');
     $<HTMLInputElement>('cidrs').value = s.cidrs.join(', ');
     $<HTMLInputElement>('bonjour').checked = s.bonjour;
     $<HTMLInputElement>('nosleep').checked = s.preventSleep;
@@ -109,14 +119,27 @@ export class StatusView {
     this.updateDirty();
   }
 
+  private setPassword(id: string, isSet: boolean, emptyHint: string): void {
+    const el = $<HTMLInputElement>(id);
+    el.value = isSet ? MASK : '';
+    el.placeholder = isSet ? '' : emptyHint;
+    el.dataset.isSet = isSet ? '1' : '';
+  }
+
+  /** 密码框的值：黑点占位或空都表示「不修改」。 */
+  private passwordValue(id: string): string {
+    const v = $<HTMLInputElement>(id).value;
+    return v === MASK ? '' : v;
+  }
+
   private readForm(): SettingsForm {
     return {
       host: $<HTMLSelectElement>('host').value,
       port: parseInt($<HTMLInputElement>('port').value, 10) || 0,
       username: $<HTMLInputElement>('user').value.trim(),
-      password: $<HTMLInputElement>('pass').value,
+      password: this.passwordValue('pass'),
       readonlyUsername: $<HTMLInputElement>('rouser').value.trim(),
-      readonlyPassword: $<HTMLInputElement>('ropass').value,
+      readonlyPassword: this.passwordValue('ropass'),
       cidrs: $<HTMLInputElement>('cidrs').value.split(/[,\s]+/).map((c) => c.trim()).filter(Boolean),
       bonjour: $<HTMLInputElement>('bonjour').checked,
       preventSleep: $<HTMLInputElement>('nosleep').checked

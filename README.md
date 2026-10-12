@@ -34,6 +34,7 @@ npm run build
 | `npm run check` | 以上三项依次执行 |
 | `npx tsx test/dev/fake-server.ts` | 不依赖 Eagle 的假数据服务，可用 rclone 联调 |
 | `npx tsx test/dev/bench.ts` | 大库压测（假数据） |
+| `node test/dev/ui-preview.mjs [端口]` | 在普通浏览器里预览插件窗口（给 Node 模块和 Eagle 接口打桩，不碰真实 Eagle；`?pw=1` 模拟已设置密码） |
 | `node test/dev/real-write-smoke.mjs <端口> <密码> [已有测试文件夹]` | 对**真实** Eagle 的写入冒烟测试，只动 `__webdav_test_` 开头的文件夹 |
 
 目录：`src/config`（配置与 scrypt）、`src/http`（服务、认证、来源过滤）、`src/dav`（路由与各方法）、`src/vfs`（命名、路径解析、影子暂存区）、`src/index`（缓存）、`src/eagle`（适配层，只有 `realAdapter.ts` 碰全局 `eagle`）。

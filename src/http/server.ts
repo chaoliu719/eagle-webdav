@@ -2,6 +2,9 @@ import * as http from 'http';
 import type { Socket } from 'net';
 import type { Config } from '../config/config';
 import type { Logger } from '../util/log';
+import { friendlyClient } from '../util/clients';
+import type { Metrics } from '../util/metrics';
+import { newCtx, runWithCtx, type ReqCtx } from '../util/reqctx';
 import { isAllowedAddress } from './access';
 import { Authenticator } from './auth';
 
@@ -13,6 +16,8 @@ export interface ServerDeps {
   /** 请求开始 / 结束的回调（防休眠等用）。 */
   activity?: { begin(): void; end(): void };
   auth?: Authenticator;
+  /** 请求耗时统计（性能快照用）。 */
+  metrics?: Metrics;
 }
 
 export interface ListenInfo {
@@ -23,6 +28,16 @@ export interface ListenInfo {
 
 /** 会读写文件内容的方法。 */
 const TRANSFER_METHODS = new Set(['GET', 'PUT', 'COPY', 'MOVE']);
+
+/** 会修改资源库的方法：成功时记 info 日志。 */
+const WRITE_METHODS = new Set(['PUT', 'MKCOL', 'DELETE', 'MOVE', 'COPY']);
+const SLOW_MS = 1000;
+const BULK_BYTES = 1024 * 1024;
+
+function pathOf(url: string | undefined): string {
+  const raw = (url ?? '').split('?')[0];
+  try { return decodeURIComponent(raw); } catch { return raw; }
+}
 
 const REALM = 'Eagle Library';
 const SERVER_NAME = 'EagleWebdav/0.1';
@@ -38,9 +53,15 @@ export class DavServer {
   private switching = false;
   private counter = 0;
   private info: ListenInfo | null = null;
+  private seenClients = new Set<string>();
+  private deniedAt = new Map<string, number>();
 
   constructor(private deps: ServerDeps) {
     this.auth = deps.auth ?? new Authenticator();
+    this.auth.events = {
+      fail: (ip, count) => deps.logger.log('warn', 'auth', 'fail', { ip, count }, `认证失败 ${ip}（第 ${count} 次）`),
+      ban: (ip, minutes) => deps.logger.log('warn', 'auth', 'ban', { ip, minutes }, `已封禁 ${ip} ${minutes} 分钟`)
+    };
   }
 
   get running(): boolean { return this.info !== null; }
@@ -71,9 +92,9 @@ export class DavServer {
       });
       if (ipv6) this.servers.push(s6);
     }
-    primary.on('error', (e) => this.deps.logger.error('服务错误：' + e.message));
+    primary.on('error', (e) => this.deps.logger.log('error', 'svc', 'error', { err: e.message }, '服务错误：' + e.message));
     this.info = { host: cfg.host, port, ipv6 };
-    this.deps.logger.info(`已监听 ${cfg.host}:${port}${ipv6 ? '（含 IPv6）' : ''}`);
+    this.deps.logger.log('info', 'svc', 'listen', { host: cfg.host, port, ipv6 }, `已监听 ${cfg.host}:${port}${ipv6 ? '（含 IPv6）' : ''}`);
     return this.info;
   }
 
@@ -84,7 +105,7 @@ export class DavServer {
     this.servers = [];
     this.sockets.forEach((sk) => sk.destroy());
     await Promise.all(closing);
-    this.deps.logger.info('服务已停止');
+    this.deps.logger.log('info', 'svc', 'stop', {}, '服务已停止');
   }
 
   private create(): http.Server {
@@ -105,10 +126,51 @@ export class DavServer {
   }
 
   private handle(req: http.IncomingMessage, res: http.ServerResponse, viaContinue: boolean): void {
+    const ctx = newCtx();
+    runWithCtx(ctx, () => this.handleCtx(req, res, viaContinue, ctx));
+  }
+
+  private logRequest(req: http.IncomingMessage, res: http.ServerResponse, status: number | 'aborted', ms: number, ip: string, ctx: ReqCtx): void {
+    const log = this.deps.logger;
+    const method = req.method ?? '';
+    const path = pathOf(req.url);
+    const client = friendlyClient(req.headers['user-agent']);
+    const key = `${ip}|${client}`;
+    if (!this.seenClients.has(key)) {
+      if (this.seenClients.size > 500) this.seenClients.clear();
+      this.seenClients.add(key);
+      log.log('info', 'cli', 'new', { ip: ip.replace(/^::ffff:/, ''), client }, `新客户端 ${client}（${ip.replace(/^::ffff:/, '')}）`);
+    }
+    const reqBytes = Number(req.headers['content-length']) || 0;
+    const resBytes = Number(res.getHeader('content-length')) || 0;
+    const base = { method, path, status, ms, eagleMs: ctx.eagleMs, eagleCalls: ctx.eagleCalls, ...ctx.fields };
+    if (status === 'aborted') {
+      log.log('warn', 'req', 'abort', { method, path, ms, sent: res.socket?.bytesWritten, received: req.socket.bytesRead, length: resBytes || reqBytes || undefined, client });
+      return;
+    }
+    const bytes = Math.max(reqBytes, resBytes);
+    const bulk = (method === 'GET' || method === 'PUT') && bytes >= BULK_BYTES;
+    const mbps = bulk && ms > 0 ? Math.round((bytes / 1048576 / (ms / 1000)) * 10) / 10 : undefined;
+    if (status >= 500 && !ctx.errored) log.log('error', 'req', 'error', { ...base, ip, client });
+    else if (WRITE_METHODS.has(method) && status < 400) {
+      const ev = method === 'PUT' ? (status === 201 ? 'put.create' : 'put.replace') : method.toLowerCase();
+      log.log('info', 'req', ev, { ...base, bytes: reqBytes || undefined, mbps, client }, `${ev} ${path} ${status} ${ms}ms`);
+    } else if (status >= 400 && status !== 401) log.log('debug', 'req', 'deny', { ...base, client });
+    else if (bulk) log.log('debug', 'req', 'xfer', { ...base, bytes, mbps, client });
+    else log.log('debug', 'req', 'done', { ...base, client });
+    if (!bulk && ms > SLOW_MS) log.log('warn', 'req', 'slow', { ...base, client }, `慢请求 ${method} ${path} ${ms}ms（Eagle ${ctx.eagleMs}ms）`);
+  }
+
+  private handleCtx(req: http.IncomingMessage, res: http.ServerResponse, viaContinue: boolean, ctx: ReqCtx): void {
     const cfg = this.deps.getConfig();
     const ip = req.socket.remoteAddress ?? '';
     if (!isAllowedAddress(ip)) {
-      this.deps.logger.warn(`拒绝来源 ${ip}`);
+      const last = this.deniedAt.get(ip) ?? 0;
+      if (Date.now() - last > 60_000) {
+        this.deniedAt.set(ip, Date.now());
+        if (this.deniedAt.size > 200) this.deniedAt.clear();
+        this.deps.logger.log('warn', 'auth', 'source-denied', { ip }, `拒绝来源 ${ip}`);
+      }
       req.socket.destroy();
       return;
     }
@@ -120,10 +182,14 @@ export class DavServer {
     // 否则 Finder 挂着一个空闲的卷也会让 Mac 永远睡不着
     const tracked = TRANSFER_METHODS.has(req.method ?? '');
     if (tracked) this.deps.activity?.begin();
+    this.deps.metrics?.begin();
     const record = (status: number | 'aborted') => {
       if (done) return;
       done = true;
       if (tracked) this.deps.activity?.end();
+      const ms = Date.now() - started;
+      this.deps.metrics?.end(req.method ?? '', ms);
+      this.logRequest(req, res, status, ms, ip, ctx);
       this.deps.logger.request({
         n, t: new Date(started).toISOString(), ip, method: req.method ?? '', url: req.url ?? '',
         status, ms: Date.now() - started,
@@ -156,7 +222,11 @@ export class DavServer {
     }
 
     this.deps.handler(req, res).catch((err: Error) => {
-      this.deps.logger.error(`处理 ${req.method} ${req.url} 失败：${err.message}`);
+      ctx.errored = true;
+      this.deps.logger.log('error', 'req', 'error', {
+        method: req.method, path: pathOf(req.url), ip, client: friendlyClient(req.headers['user-agent']),
+        err: err.message, stack: (err.stack ?? '').split('\n').slice(1, 4).map((l) => l.trim())
+      }, `处理 ${req.method} ${req.url} 失败：${err.message}`);
       if (!res.headersSent) this.send(res, 500, {}, 'Internal Server Error');
       else res.destroy();
     });

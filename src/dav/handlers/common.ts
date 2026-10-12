@@ -4,6 +4,7 @@ import type * as http from 'http';
 import * as path from 'path';
 import { ImportTimeoutError } from '../../eagle/adapter';
 import { send } from '../../http/respond';
+import { noteReq } from '../../util/reqctx';
 import { eagleSanitizeName } from '../../vfs/naming';
 import { pathKey, type Resolved } from '../../vfs/resolver';
 import type { DavContext } from '../context';
@@ -51,6 +52,7 @@ export async function importAt(ctx: DavContext, file: string, name: string, fold
   try {
     const id = await ctx.adapter.importFile(file, { name: base, folders: folderId === null ? [] : [folderId] });
     ctx.index.invalidate();
+    noteReq({ id });
     // 实测：内容与库内已有文件相同时 Eagle 立即返回 id，但会弹「重复添加提示」，等人确认后才真正入库
     // 以「目录列表里能否看到它」为准：弹重复提示时 getById 已经能返回条目，不能用它判断
     let landed = false;
@@ -61,8 +63,13 @@ export async function importAt(ctx: DavContext, file: string, name: string, fold
     if (!landed) watchPending(ctx, id, name, folderId);
     return { ok: true, id };
   } catch (e) {
-    if (e instanceof ImportTimeoutError) return { ok: false, status: 415, message: 'Eagle 无法识别该文件格式（导入超时）' };
-    ctx.logger.error(`导入失败 ${name}：${(e as Error).message}`);
+    let bytes: number | undefined;
+    try { bytes = fs.statSync(file).size; } catch { /* ignore */ }
+    if (e instanceof ImportTimeoutError) {
+      ctx.logger.log('error', 'imp', 'timeout', { name, ext, bytes, waitSec: 20 }, `导入超时 ${name}：Eagle 无法识别该文件格式`);
+      return { ok: false, status: 415, message: 'Eagle 无法识别该文件格式（导入超时）' };
+    }
+    ctx.logger.log('error', 'imp', 'fail', { name, ext, bytes, err: (e as Error).message }, `导入失败 ${name}：${(e as Error).message}`);
     return { ok: false, status: 500, message: '导入失败' };
   }
 }
@@ -86,6 +93,7 @@ export function watchPending(
   ctx: DavContext, id: string, name: string, folderId: string | null, pollMs = PENDING_POLL_MS, giveUpMs = PENDING_GIVE_UP_MS
 ): void {
   const key = 'pending:' + id;
+  ctx.logger.log('info', 'imp', 'pending', { id, name }, `「${name}」在等 Eagle 的重复添加确认`);
   ctx.logger.notice(key, `「${name}」还没有入库：Eagle 弹出了「重复添加提示」，请到 Eagle 里点一下确认。`, { kind: 'warn', title: '有文件在等你确认' });
   const started = Date.now();
   const timer = setInterval(() => {
@@ -94,6 +102,7 @@ export function watchPending(
         clearInterval(timer);
         ctx.logger.clearNotice(key);
         if (listed) ctx.index.invalidate();
+        ctx.logger.log(listed ? 'info' : 'warn', 'imp', listed ? 'done' : 'giveup', { id, name, waitMs: Date.now() - started }, listed ? `「${name}」已入库` : `「${name}」等了 10 分钟仍未入库，不再跟踪`);
       }
     });
   }, pollMs);

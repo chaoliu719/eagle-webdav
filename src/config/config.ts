@@ -1,6 +1,7 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import { LOG_LEVELS, type LogLevel } from '../util/log';
 
 export interface Config {
   /** 监听地址。默认仅本机，用户在状态窗口里选择局域网网卡后才对外。 */
@@ -20,6 +21,8 @@ export interface Config {
   bonjour: boolean;
   /** 有客户端连接时阻止 Mac 休眠（caffeinate）。仅 macOS。 */
   preventSleep: boolean;
+  /** 文件日志级别，只在配置文件里改；debug 会逐条记录请求与 Eagle 调用。 */
+  logLevel: LogLevel;
 }
 
 export const DEFAULT_CONFIG: Config = {
@@ -31,7 +34,8 @@ export const DEFAULT_CONFIG: Config = {
   allView: true,
   autoStart: true,
   bonjour: true,
-  preventSleep: true
+  preventSleep: true,
+  logLevel: 'info'
 };
 
 const SCRYPT_N = 16384;
@@ -69,7 +73,8 @@ function sanitize(raw: unknown): Config {
     allView: typeof r.allView === 'boolean' ? r.allView : d.allView,
     autoStart: typeof r.autoStart === 'boolean' ? r.autoStart : d.autoStart,
     bonjour: typeof r.bonjour === 'boolean' ? r.bonjour : d.bonjour,
-    preventSleep: typeof r.preventSleep === 'boolean' ? r.preventSleep : d.preventSleep
+    preventSleep: typeof r.preventSleep === 'boolean' ? r.preventSleep : d.preventSleep,
+    logLevel: LOG_LEVELS.includes(r.logLevel as LogLevel) ? (r.logLevel as LogLevel) : d.logLevel
   };
 }
 

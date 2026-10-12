@@ -1,3 +1,5 @@
+import { currentCtx } from './reqctx';
+
 export interface RequestEntry {
   n: number;
   t: string;
@@ -14,7 +16,20 @@ export interface RequestEntry {
   length?: string;
 }
 
+export type LogLevel = 'error' | 'warn' | 'info' | 'debug';
+export const LOG_LEVELS: LogLevel[] = ['error', 'warn', 'info', 'debug'];
+const RANK: Record<LogLevel, number> = { error: 0, warn: 1, info: 2, debug: 3 };
+
+/** 文件日志的写入端（FileLog 实现它；测试里可以替换）。 */
+export interface LogSink { write(rec: object): void }
+
 export interface Logger {
+  /**
+   * 结构化日志：cat 分类（svc / req / eagle / idx / imp / cli / sys / perf / auth / proc），
+   * ev 事件名，fields 事件字段；text 是给窗口与 eagle.log 看的一句话（省略则由字段拼出）。
+   * 在请求里调用时自动带上请求号 rid。
+   */
+  log(level: LogLevel, cat: string, ev: string, fields?: Record<string, unknown>, text?: string): void;
   info(msg: string): void;
   warn(msg: string): void;
   error(msg: string): void;
@@ -48,6 +63,12 @@ export interface Notice {
 
 const RING_SIZE = 500;
 
+function brief(v: unknown): string {
+  if (typeof v === 'string') return v.length > 60 ? v.slice(0, 57) + '…' : v;
+  if (v && typeof v === 'object') { const j = JSON.stringify(v); return j.length > 60 ? j.slice(0, 57) + '…' : j; }
+  return String(v);
+}
+
 /**
  * 日志：请求摘要保留在内存环里供状态窗口显示，其余同步写入 eagle.log（若存在）。
  * 不记录 Authorization 头与密码。
@@ -59,11 +80,24 @@ export class RingLogger implements Logger {
   private notices = new Map<string, Notice>();
   onNotice?: (n: Notice) => void;
 
+  /** 写入文件的最低级别（debug 最详细）；窗口与 eagle.log 只收 info 及以上，除非这里设成 debug。 */
+  level: LogLevel = 'info';
+  file?: LogSink;
+
   constructor(private sink?: (level: 'info' | 'warn' | 'error', msg: string) => void) {}
 
-  info(msg: string): void { this.out('info', msg); }
-  warn(msg: string): void { this.out('warn', msg); }
-  error(msg: string): void { this.out('error', msg); }
+  info(msg: string): void { this.log('info', 'misc', 'msg', { msg }, msg); }
+  warn(msg: string): void { this.log('warn', 'misc', 'msg', { msg }, msg); }
+  error(msg: string): void { this.log('error', 'misc', 'msg', { msg }, msg); }
+
+  log(level: LogLevel, cat: string, ev: string, fields: Record<string, unknown> = {}, text?: string): void {
+    if (RANK[level] > RANK[this.level]) return;
+    const rid = currentCtx()?.rid;
+    const rec = { ts: new Date().toISOString(), level, cat, ev, ...(rid ? { rid } : {}), ...fields };
+    try { this.file?.write(rec); } catch { /* 日志本身不能让服务崩溃 */ }
+    const line = text ?? `${cat}.${ev} ` + Object.entries(fields).map(([k, v]) => `${k}=${brief(v)}`).join(' ');
+    this.out(level === 'debug' ? 'info' : level, line.trim());
+  }
 
   request(entry: RequestEntry): void {
     this.ring.push(entry);
@@ -77,7 +111,7 @@ export class RingLogger implements Logger {
     const actions = opts.actions ?? (kind === 'warn' ? [{ label: '忽略', run: () => this.clearNotice(key) }] : []);
     const n: Notice = { key, message, t: Date.now(), kind, title: opts.title, actions };
     this.notices.set(key, n);
-    this.out(kind === 'error' ? 'error' : 'warn', (opts.title ? opts.title + '：' : '') + message);
+    this.log(kind === 'error' ? 'error' : 'warn', 'notice', key, { title: opts.title, message }, (opts.title ? opts.title + '：' : '') + message);
     if (isNew) { try { this.onNotice?.(n); } catch { /* ignore */ } }
   }
 

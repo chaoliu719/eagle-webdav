@@ -69,6 +69,18 @@ Infuse 与 iPad 实机、Finder 图形界面的拖拽、几十万条的真实大
 - 版本 1.0.0；`npm run package` 生成 `dist/eagle-webdav-<版本>.eagleplugin` 与同内容的 `.zip`（实测 Eagle「打包插件」产物就是 plugin/ 内容的 zip，文件名 `Eagle WebDAV.eagleplugin`，生成在项目根目录，已 gitignore）。**安装流程已真机验证**：`open dist/eagle-webdav-<版本>.eagleplugin`（双击同理）→ Eagle 弹出「Install eagle-webdav-<版本>?」→ 点 Install → 装到 `~/Library/Application Support/Eagle/Plugins/EAGLEWEBDAV01`，`runAfterInstall` 使服务立即自启并沿用 `eagle-webdav/config.json`；「开发」标签里的「卸载」只移除登记，不删项目源码，也不删配置目录；`npm run check` = 类型检查 + 单元测试 + 构建；CI 见 `.github/workflows/ci.yml`
 - `plugin/manifest.json` 的 `devTools` 现为 `false`。开发调试时临时改成 `true` 可弹出开发者工具（控制台可 `location.reload()`）；不开 DevTools 时，用 Eagle 工具栏「插件 → 开发」标签里该插件右侧「…」菜单的「重新加载」，并改完 manifest 后需重新加载才生效
 
+## 日志系统（用户确认的精简方案，设计稿在画布「日志系统」）
+- 给开发者留证据，**窗口里只多两个按钮**（「最近请求与日志」折叠区底部：复制诊断信息、打开日志文件夹）；不做「活动」人话列表、响应指示灯、同类合并（用户认为必要性和可实现性不足，已砍）
+- 文件日志默认开启：`<配置目录>/logs/webdav-YYYY-MM-DD.log`，每行一条 JSON（`ts level cat ev rid …`），批量（200ms）同步追加，单文件 5MB 滚动成 `.N.log`，保留 7 天，总量 35MB；写失败只计数不影响服务（`src/util/fileLog.ts`）。级别 `logLevel`（error/warn/info/debug，默认 info）只在配置文件里改，窗口没有开关
+- 入口 `Logger.log(level, cat, ev, fields, text?)`；`info/warn/error` 保留为 `cat:"misc"`。分类：svc / req / eagle / idx / imp / cli / sys / perf / auth / proc。窗口与 eagle.log 只收 info 及以上
+- 请求号：`AsyncLocalStorage`（`src/util/reqctx.ts`）每请求一个 6 位 `rid`，同一请求的所有日志（含 Eagle 调用）共用；handler 用 `noteReq({...})` 补字段（条目 id、条目数）。注意 `res.on('finish')` 这类事件回调里拿不到上下文，要用闭包里的 ctx
+- Eagle 调用计时：`instrumentAdapter`（Proxy 装饰器，`src/eagle/instrumented.ts`）在 main.ts 里套在 `RealEagleAdapter` 外面，`realAdapter.ts` 不动；累计到 `ctx.eagleMs`；>500ms 记 `eagle.slow`（warn），报错记 `eagle.error`（只带参数形状如 `str,arr2`，不带内容），debug 级记每次调用；导入超时是预期内的，不记 eagle.error
+- 记录规则：写操作成功（`put.create` 201 / `put.replace` / `mkcol` / `delete` / `move` / `copy`）info；普通读取（GET、PROPFIND、心跳）**不写文件**（debug 才有 `req.done`），除非慢（>1s 且不是 ≥1MB 的传输）→ `req.slow`（warn，带 eagleMs 拆分和条目数）、出错 → `req.error`（带堆栈前 3 行，同一个 500 只记一次）、中断 → `req.abort`；设计内的 4xx（403/415…，401 握手除外）debug 级 `req.deny`；`cli.new` 新客户端首次出现；认证失败 `auth.fail`（只记来源和次数，不记尝试的账号密码）、封禁 `auth.ban`；`svc.start/listen/stop/config/library`（config 只记改了哪些字段名）；`imp.pending/done/giveup/timeout/fail`；`sys.bonjour/sleep`；`proc.uncaught`（window 的 error / unhandledrejection 与 process uncaughtException）
+- 缓存与性能：`idx.invalidate`（debug，原因 library-modified / library-switched / expired / write）、`idx.rebuild`（debug，>300ms 升 info）；`LibraryIndex.stats` 累计命中/未命中（条目缓存与目录列表缓存）；`Metrics` 保留最近 5 分钟样本，每 60 秒写一条 `perf.snapshot`（这 60 秒内有请求才写：各方法请求数、p50/p95、缓存命中率增量、堆内存、在途峰值）
+- 「复制诊断信息」（`src/util/diagnostics.ts`）：版本、Eagle Build、系统、库名与文件夹数、监听与开关、最近 5 分钟性能、文件日志最近 200 行（不含 debug）；资源库路径替换成 `<资源库>`、用户主目录替换成 `~`；不含密码与哈希、账号名、认证头、文件内容。设计稿里的「条目数」改成了文件夹数（`item.count` 的行为没实测）。剪贴板不可用时 toast 提示去日志文件夹取文件
+- 构建时 `__PLUGIN_VERSION__` 由 esbuild 从 `plugin/manifest.json` 注入；预览脚本 `test/dev/ui-preview.mjs` 已给 `async_hooks`、更多 fs 方法打桩（写入的日志在 `window.__logfile`）
+- 未实测：真实 Eagle 里的日志文件落盘与「打开日志文件夹」（`open` 命令）、真实库上的性能快照数字
+
 ## 补充笔记（实测与实现）
 - 脚本加载瞬间 `eagle.app` 的 version、build、userDataPath 读不到（曾显示 Build 0），初始化要等 `onPluginCreate`，build 读不到时不拦截启动
 - 真机核对结果（Eagle 4.0.0 Build 23）：`eagle.app.userDataPath` 存在（`~/Library/Application Support/Eagle`，配置放其下 `eagle-webdav/`），但要等 `onPluginCreate`；`folder.getAll()` 返回的元素带 `children`，Folder 成员有 `createdAt`、`parent`、`children`、`description`、`icon`、`iconColor`；Item 成员还有 `palettes`、`comments`、`metadataFilePath`、`noThumbnail`、`noPreview`；**`item.get` 带 `fields` 时 `importedAt` / `modifiedAt` 会变成 0**（`getById` 与不带 fields 的 `get` 才是真值，毫秒时间戳），所以列表不用 fields；`item.get({folders:[id]})` 按直属条目工作正常；未分类 = 取全库再过滤（大库慢，M4 优化）

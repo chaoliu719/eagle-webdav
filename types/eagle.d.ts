@@ -27,3 +27,6 @@ interface EagleGlobal {
 }
 
 declare const eagle: EagleGlobal | undefined;
+
+/** 构建时由 esbuild 从 plugin/manifest.json 注入。 */
+declare const __PLUGIN_VERSION__: string;

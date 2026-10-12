@@ -8,6 +8,7 @@ import type { LibraryIndex } from '../index/libraryIndex';
 import type { Logger } from '../util/log';
 import { KeyedMutex } from '../util/mutex';
 import { ShadowStore } from '../vfs/shadow';
+import { noteReq } from '../util/reqctx';
 import { Resolver, isCollection, isReadOnlyView, pathKey, type Resolved } from '../vfs/resolver';
 import type { DavContext } from './context';
 import { handleDelete } from './handlers/delete';
@@ -48,7 +49,7 @@ export class DavRouter {
     opts: { maxPut?: number; tmpRoot?: string; shadowDir?: string; tagsView?: () => boolean; allView?: () => boolean } = {}
   ) {
     this.shadow = new ShadowStore(Date.now, opts.shadowDir);
-    this.resolver = new Resolver(index, this.shadow, { tagsView: opts.tagsView, allView: opts.allView });
+    this.resolver = new Resolver(index, this.shadow, { tagsView: opts.tagsView, allView: opts.allView, logger });
     this.ctx = {
       adapter, index, resolver: this.resolver, locks: this.locks, shadow: this.shadow, logger, mutex: new KeyedMutex(),
       tmpRoot: opts.tmpRoot ?? path.join(os.tmpdir(), 'eagle-webdav', 'put'),
@@ -122,6 +123,7 @@ export class DavRouter {
     await write(res, responseXml(resourceOfResolved(r, fallback), request, this.locks, this.ctx.deadProps.get(pathKey(r.segs))));
     if (depth === '1' && r.kind !== 'item') {
       const entries = await this.resolver.children(r);
+      noteReq({ items: entries.length });
       if (entries.length > WARN_ENTRIES) this.logger.warn(`目录条目过多：${hrefOf(r.segs, true)} 共 ${entries.length} 项`);
       let n = 0;
       for (const e of entries) {

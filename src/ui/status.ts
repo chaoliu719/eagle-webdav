@@ -42,6 +42,10 @@ export interface StatusHandlers {
   onSave(form: SettingsForm): void;
   /** 读取已保存的配置，供「放弃」恢复表单。 */
   getSettings(): InitialSettings;
+  /** 「复制诊断信息」。 */
+  onCopyDiagnostics(): void;
+  /** 「打开日志文件夹」。 */
+  onOpenLogs(): void;
 }
 
 export interface InitialSettings {
@@ -90,19 +94,23 @@ function iconFor(client: string): { svg: string; alt: boolean } {
   return { svg: ICON_MONITOR, alt: false };
 }
 
-function copyText(text: string): void {
-  const fallback = () => {
+/** 写剪贴板；成功返回 true。 */
+export async function copyText(text: string): Promise<boolean> {
+  const fallback = (): boolean => {
     const ta = document.createElement('textarea');
     ta.value = text;
     document.body.appendChild(ta);
     ta.select();
-    try { document.execCommand('copy'); } catch { /* ignore */ }
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch { /* ignore */ }
     ta.remove();
+    return ok;
   };
   try {
-    void navigator.clipboard.writeText(text).catch(fallback);
+    await navigator.clipboard.writeText(text);
+    return true;
   } catch {
-    fallback();
+    return fallback();
   }
 }
 
@@ -141,9 +149,11 @@ export class StatusView {
     $('svc').addEventListener('click', () => (this.getSwitch('svc') ? handlers.onStop() : handlers.onStart()));
     $('btnSave').addEventListener('click', () => handlers.onSave(this.readForm()));
     $('btnDiscard').addEventListener('click', () => this.applySettings(handlers.getSettings()));
+    $('btnDiag').addEventListener('click', () => handlers.onCopyDiagnostics());
+    $('btnLogs').addEventListener('click', () => handlers.onOpenLogs());
     $('btnCopy').addEventListener('click', () => {
       if (!this.address) return;
-      copyText(this.address);
+      void copyText(this.address);
       $('copyText').textContent = '已复制';
       setTimeout(() => { $('copyText').textContent = '复制'; }, 1200);
     });

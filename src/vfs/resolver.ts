@@ -1,4 +1,5 @@
 import type { FolderInfo, ItemInfo } from '../eagle/adapter';
+import type { Logger } from '../util/log';
 import type { LibraryIndex } from '../index/libraryIndex';
 import { buildEntries, EntryIndex, type Entry } from './naming';
 import type { ShadowEntry, ShadowStore } from './shadow';
@@ -38,6 +39,7 @@ export interface ResolverOptions {
   tagsView?: () => boolean;
   /** 是否暴露只读的「@全部」视图。 */
   allView?: () => boolean;
+  logger?: Logger;
 }
 
 export class Resolver {
@@ -66,9 +68,13 @@ export class Resolver {
     await this.index.ensureFresh();
     const key = this.listingKey(r) + (r.kind === 'root' ? (this.tagsEnabled() ? ':t' : '') + (this.allEnabled() ? ':a' : '') : '');
     const hit = this.listings.get(key);
-    if (hit && hit.rev === this.index.revision) return hit.index;
+    if (hit && hit.rev === this.index.revision) { this.index.stats.hit++; return hit.index; }
+    this.index.stats.miss++;
+    const t0 = Date.now();
     const entries = await this.realChildren(r);
     const built = new EntryIndex(entries);
+    const ms = Date.now() - t0;
+    this.opts.logger?.log(ms > 300 ? 'info' : 'debug', 'idx', 'rebuild', { key: this.listingKey(r), n: entries.length, ms });
     this.listings.set(key, { rev: this.index.revision, index: built });
     if (this.listings.size > 2000) this.listings.delete(this.listings.keys().next().value as string);
     return built;

@@ -12,7 +12,7 @@ export class SleepGuard {
   private timer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
-    private opts: { enabled: () => boolean; idleMs?: number; spawnFn?: Spawn; platform?: string } = { enabled: () => true }
+    private opts: { enabled: () => boolean; idleMs?: number; spawnFn?: Spawn; platform?: string; onChange?: (active: boolean, inflight: number) => void } = { enabled: () => true }
   ) {}
 
   private get idleMs(): number { return this.opts.idleMs ?? 60_000; }
@@ -37,9 +37,11 @@ export class SleepGuard {
     try {
       // -w：被监视的进程（Eagle 的渲染进程）退出时 caffeinate 自己也退出，避免遗留
       const child = spawnFn('caffeinate', ['-i', '-w', String(process.pid)]);
-      child.on('exit', () => { if (this.child === child) this.child = null; });
-      child.on('error', () => { if (this.child === child) this.child = null; });
+      const gone = () => { if (this.child === child) { this.child = null; this.opts.onChange?.(false, this.inflight); } };
+      child.on('exit', gone);
+      child.on('error', gone);
       this.child = child;
+      this.opts.onChange?.(true, this.inflight);
     } catch {
       this.child = null;
     }
@@ -58,5 +60,6 @@ export class SleepGuard {
     const c = this.child;
     this.child = null;
     try { c?.kill(); } catch { /* ignore */ }
+    if (c) this.opts.onChange?.(false, this.inflight);
   }
 }

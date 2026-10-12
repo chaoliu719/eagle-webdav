@@ -20,6 +20,8 @@ function safeEqual(a: string, b: string): boolean {
 /** Basic 认证；同一源 IP 连续失败 10 次封禁 10 分钟。 */
 export class Authenticator {
   private failures = new Map<string, { count: number; bannedUntil: number }>();
+  /** 失败 / 封禁的回调（server 用来写日志）；只传来源和次数，不含尝试的账号密码。 */
+  events: { fail?(ip: string, count: number): void; ban?(ip: string, minutes: number): void } = {};
 
   constructor(private now: () => number = Date.now) {}
 
@@ -55,7 +57,11 @@ export class Authenticator {
     const rec = this.failures.get(ip) ?? { count: 0, bannedUntil: 0 };
     if (rec.bannedUntil && rec.bannedUntil <= this.now()) { rec.count = 0; rec.bannedUntil = 0; }
     rec.count++;
-    if (rec.count >= MAX_FAILURES) rec.bannedUntil = this.now() + BAN_MS;
     this.failures.set(ip, rec);
+    this.events.fail?.(ip, rec.count);
+    if (rec.count >= MAX_FAILURES) {
+      rec.bannedUntil = this.now() + BAN_MS;
+      this.events.ban?.(ip, BAN_MS / 60_000);
+    }
   }
 }

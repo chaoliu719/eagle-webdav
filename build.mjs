@@ -1,4 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { build, context } from 'esbuild';
+
+const { version } = JSON.parse(readFileSync('plugin/manifest.json', 'utf8'));
 
 const options = {
   entryPoints: ['src/main.ts'],
@@ -8,6 +11,7 @@ const options = {
   target: 'node16',
   format: 'iife',
   external: ['electron'],
+  define: { __PLUGIN_VERSION__: JSON.stringify(version) },
   sourcemap: false,
   logLevel: 'info'
 };

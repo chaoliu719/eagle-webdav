@@ -129,6 +129,8 @@
   .more summary::-webkit-details-marker { display:none; }
   .more summary svg { color:var(--faint); transition:transform .15s; }
   .more details[open] summary svg { transform:rotate(90deg); }
+  .logtools { display:flex; gap:6px; margin:0 22px 16px; }
+  .btn.ghost { border-color:transparent; background:transparent; color:var(--acc); }
   .more pre { margin:0 22px 18px; background:var(--well); border-radius:8px; padding:10px 12px; font:12px/1.5 ui-monospace, "SF Mono", Menlo, monospace; max-height:200px; overflow:auto; white-space:pre-wrap; word-break:break-all; }
 </style>
 </head>
@@ -214,6 +216,7 @@
   <details>
     <summary>日志<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>
     <pre id="msglog"></pre>
+    <div class="logtools"><button type="button" class="btn" id="btnDiag">复制诊断信息</button><button type="button" class="btn ghost" id="btnLogs">打开日志文件夹</button></div>
   </details>
 </section>
 

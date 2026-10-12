@@ -1,4 +1,5 @@
 import type { EagleAdapter, FolderInfo, ItemInfo } from '../eagle/adapter';
+import type { Logger } from '../util/log';
 
 const FRESH_CHECK_MS = 1500;
 const MAX_AGE_MS = 60_000;
@@ -26,9 +27,14 @@ export class LibraryIndex {
   private loadedAt = 0;
   private checking: Promise<void> | null = null;
 
+  /** 条目缓存与目录列表缓存的累计命中 / 未命中次数，性能快照用。 */
+  readonly stats = { hit: 0, miss: 0 };
+  logger?: Logger;
+
   constructor(private adapter: EagleAdapter, private now: () => number = Date.now) {}
 
-  private clear(): void {
+  private clear(reason: string): void {
+    this.logger?.log('debug', 'idx', 'invalidate', { reason, revision: this.revision + 1 });
     this.folderPromise = null;
     this.tagPromise = null;
     this.itemPromises.clear();
@@ -38,7 +44,7 @@ export class LibraryIndex {
   }
 
   invalidate(): void {
-    this.clear();
+    this.clear('write');
     this.libMod = -1;
     this.checkedAt = 0;
   }
@@ -66,9 +72,11 @@ export class LibraryIndex {
     if (!this.checking) {
       this.checking = (async () => {
         const info = await this.adapter.libraryInfo();
-        const stale = info.modificationTime !== this.libMod || info.path !== this.libPath || this.now() - this.loadedAt > MAX_AGE_MS;
-        if (stale) {
-          this.clear();
+        const reason = info.path !== this.libPath && this.libPath ? 'library-switched'
+          : info.modificationTime !== this.libMod ? 'library-modified'
+          : this.now() - this.loadedAt > MAX_AGE_MS ? 'expired' : '';
+        if (reason) {
+          this.clear(reason);
           this.loadedAt = this.now();
         }
         this.libMod = info.modificationTime;
@@ -127,11 +135,13 @@ export class LibraryIndex {
     await this.ensureFresh();
     let p = this.itemPromises.get(key);
     if (p) {
+      this.stats.hit++;
       // 命中：移到末尾，表示最近使用
       this.itemPromises.delete(key);
       this.itemPromises.set(key, p);
       return p;
     }
+    this.stats.miss++;
     const created = load().then((list) => list.map((i) => this.normalize(i)));
     created.then((list) => {
       if (this.itemPromises.get(key) !== created) return;

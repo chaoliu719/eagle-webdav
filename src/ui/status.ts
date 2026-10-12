@@ -18,7 +18,7 @@ export function lanAddresses(): LanAddress[] {
   return out;
 }
 
-export interface StartForm {
+export interface SettingsForm {
   host: string;
   port: number;
   username: string;
@@ -31,8 +31,13 @@ export interface StartForm {
 }
 
 export interface StatusHandlers {
-  onStart(form: StartForm): void;
+  /** 用已保存的配置启动。 */
+  onStart(): void;
   onStop(): void;
+  /** 保存表单并自动启动（运行中则重启）。 */
+  onSave(form: SettingsForm): void;
+  /** 读取已保存的配置，供「放弃」恢复表单。 */
+  getSettings(): InitialSettings;
 }
 
 export interface InitialSettings {
@@ -63,29 +68,52 @@ export class StatusView {
     this.timer = setInterval(() => this.renderLog(true), 2000);
   }
 
-  bind(handlers: StatusHandlers, initial: InitialSettings): void {
+  private baseline = '';
+
+  bind(handlers: StatusHandlers): void {
+    const initial = handlers.getSettings();
     const sel = $<HTMLSelectElement>('host');
     const options: Array<[string, string]> = [['仅本机（127.0.0.1）', '127.0.0.1']];
     for (const a of lanAddresses()) options.push([`${a.address}（${a.name}）`, a.address]);
     options.push(['所有网卡（0.0.0.0）', '0.0.0.0']);
     if (!options.some((o) => o[1] === initial.host)) options.push([initial.host, initial.host]);
     for (const [label, value] of options) sel.add(new Option(label, value));
-    sel.value = initial.host;
-    sel.addEventListener('change', () => this.updateHostWarning());
 
-    $<HTMLInputElement>('port').value = String(initial.port);
-    $<HTMLInputElement>('user').value = initial.username;
-    $<HTMLInputElement>('pass').placeholder = initial.hasPassword ? '已设置，留空保持不变' : '未设置';
-    $<HTMLInputElement>('rouser').value = initial.readonlyUsername;
-    $<HTMLInputElement>('ropass').placeholder = initial.hasReadonlyPassword ? '已设置，留空保持不变' : '未启用';
-    $<HTMLInputElement>('cidrs').value = initial.cidrs.join(', ');
-    $<HTMLInputElement>('bonjour').checked = initial.bonjour;
-    $<HTMLInputElement>('nosleep').checked = initial.preventSleep;
+    this.applySettings(initial);
+    for (const id of ['host', 'port', 'user', 'pass', 'rouser', 'ropass', 'cidrs', 'bonjour', 'nosleep']) {
+      const el = $(id);
+      el.addEventListener('input', () => this.updateDirty());
+      el.addEventListener('change', () => { this.updateHostWarning(); this.updateDirty(); });
+    }
+
+    $('btnStart').addEventListener('click', () => handlers.onStart());
+    $('btnStop').addEventListener('click', () => handlers.onStop());
+    $('btnSave').addEventListener('click', () => handlers.onSave(this.readForm()));
+    $('btnDiscard').addEventListener('click', () => this.applySettings(handlers.getSettings()));
+  }
+
+  /** 用已保存的配置填充表单（保存成功后、或点「放弃」时），并清空密码框。 */
+  applySettings(s: InitialSettings): void {
+    $<HTMLSelectElement>('host').value = s.host;
+    $<HTMLInputElement>('port').value = String(s.port);
+    $<HTMLInputElement>('user').value = s.username;
+    $<HTMLInputElement>('pass').value = '';
+    $<HTMLInputElement>('pass').placeholder = s.hasPassword ? '已设置，留空保持不变' : '未设置';
+    $<HTMLInputElement>('rouser').value = s.readonlyUsername;
+    $<HTMLInputElement>('ropass').value = '';
+    $<HTMLInputElement>('ropass').placeholder = s.hasReadonlyPassword ? '已设置，留空保持不变' : '未启用';
+    $<HTMLInputElement>('cidrs').value = s.cidrs.join(', ');
+    $<HTMLInputElement>('bonjour').checked = s.bonjour;
+    $<HTMLInputElement>('nosleep').checked = s.preventSleep;
     this.updateHostWarning();
+    this.baseline = JSON.stringify(this.readForm());
+    this.updateDirty();
+  }
 
-    $('btnStart').addEventListener('click', () => handlers.onStart({
-      host: sel.value,
-      port: parseInt($<HTMLInputElement>('port').value, 10) || 41600,
+  private readForm(): SettingsForm {
+    return {
+      host: $<HTMLSelectElement>('host').value,
+      port: parseInt($<HTMLInputElement>('port').value, 10) || 0,
       username: $<HTMLInputElement>('user').value.trim(),
       password: $<HTMLInputElement>('pass').value,
       readonlyUsername: $<HTMLInputElement>('rouser').value.trim(),
@@ -93,8 +121,24 @@ export class StatusView {
       cidrs: $<HTMLInputElement>('cidrs').value.split(/[,\s]+/).map((c) => c.trim()).filter(Boolean),
       bonjour: $<HTMLInputElement>('bonjour').checked,
       preventSleep: $<HTMLInputElement>('nosleep').checked
-    }));
-    $('btnStop').addEventListener('click', () => handlers.onStop());
+    };
+  }
+
+  /** 有未保存的修改时才启用「保存」「放弃」。 */
+  private updateDirty(): void {
+    const dirty = JSON.stringify(this.readForm()) !== this.baseline;
+    $<HTMLButtonElement>('btnSave').disabled = !dirty;
+    $<HTMLButtonElement>('btnDiscard').disabled = !dirty;
+    $('dirty').textContent = dirty ? '有未保存的修改' : '';
+  }
+
+  setSaving(saving: boolean): void {
+    if (saving) {
+      $<HTMLButtonElement>('btnSave').disabled = true;
+      $<HTMLButtonElement>('btnDiscard').disabled = true;
+    } else {
+      this.updateDirty();
+    }
   }
 
   private updateHostWarning(): void {
@@ -113,7 +157,6 @@ export class StatusView {
     $<HTMLButtonElement>('btnStop').disabled = !running;
     $('state').textContent = running ? '运行中' : '未启动';
     $('state').classList.toggle('on', running);
-    for (const id of ['pass', 'ropass']) $<HTMLInputElement>(id).value = '';
   }
 
   setDiscovery(name: string | null): void {

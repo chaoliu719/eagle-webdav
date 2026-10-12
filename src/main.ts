@@ -8,7 +8,7 @@ import { DavRouter } from './dav/router';
 import { parseCidr } from './http/access';
 import { DavServer } from './http/server';
 import { LibraryIndex } from './index/libraryIndex';
-import { StatusView } from './ui/status';
+import { StatusView, type InitialSettings, type SettingsForm } from './ui/status';
 import { Bonjour } from './util/bonjour';
 import { RingLogger } from './util/log';
 import { SleepGuard } from './util/sleepGuard';
@@ -74,6 +74,50 @@ async function stop(): Promise<void> {
   view.setStatus('已停止');
 }
 
+function currentSettings(): InitialSettings {
+  const c = store.get();
+  return {
+    host: c.host, port: c.port, username: c.username, hasPassword: !!c.passwordHash,
+    readonlyUsername: c.readonlyUsername, hasReadonlyPassword: !!c.readonlyPasswordHash,
+    cidrs: c.extraAllowedCidrs, bonjour: c.bonjour, preventSleep: c.preventSleep
+  };
+}
+
+let saving = false;
+
+/** 保存设置并自动启动（运行中则先停止再启动）。校验不通过时不保存、不重启，表单保持原样。 */
+async function save(form: SettingsForm): Promise<void> {
+  if (saving) return;
+  const fail = (msg: string) => view.setStatus(msg, true);
+  if (!form.username) return fail('管理账号的用户名不能为空');
+  if (!Number.isInteger(form.port) || form.port < 1 || form.port > 65535) return fail('端口必须是 1 到 65535 之间的数字');
+  if (form.readonlyUsername && form.readonlyUsername === form.username) return fail('只读账号的用户名不能和管理账号相同');
+  const loopback = form.host === '127.0.0.1' || form.host === '::1';
+  if (!loopback && !form.password && !store.get().passwordHash) return fail('监听非本机地址前，必须先设置管理账号的密码');
+  const bad = form.cidrs.filter((c) => parseCidr(c) === null);
+  if (bad.length) return fail(`网段格式不对：${bad.join('、')}（应形如 100.64.0.0/10）`);
+
+  saving = true;
+  view.setSaving(true);
+  try {
+    if (form.password) store.setPassword(form.password);
+    if (form.readonlyPassword) store.setReadonlyPassword(form.readonlyPassword);
+    store.update({
+      host: form.host, port: form.port, username: form.username,
+      readonlyUsername: form.readonlyUsername || 'viewer',
+      extraAllowedCidrs: form.cidrs,
+      bonjour: form.bonjour, preventSleep: form.preventSleep
+    });
+    view.applySettings(currentSettings());
+    view.setStatus('已保存，正在重启服务…');
+    if (server.running) await stop();
+    await start();
+  } finally {
+    saving = false;
+    view.setSaving(false);
+  }
+}
+
 let initialized = false;
 
 function init(): void {
@@ -90,26 +134,10 @@ function init(): void {
   } catch { /* ignore */ }
 
   view.bind({
-    onStart(form) {
-      if (form.readonlyUsername && form.readonlyUsername === form.username) {
-        view.setStatus('只读账号的用户名不能和管理账号相同', true);
-        return;
-      }
-      if (form.password) store.setPassword(form.password);
-      if (form.readonlyPassword) store.setReadonlyPassword(form.readonlyPassword);
-      store.update({
-        host: form.host, port: form.port, username: form.username,
-        readonlyUsername: form.readonlyUsername || 'viewer',
-        extraAllowedCidrs: form.cidrs.filter((c) => parseCidr(c) !== null),
-        bonjour: form.bonjour, preventSleep: form.preventSleep
-      });
-      void start();
-    },
-    onStop() { void stop(); }
-  }, {
-    host: cfg.host, port: cfg.port, username: cfg.username, hasPassword: !!cfg.passwordHash,
-    readonlyUsername: cfg.readonlyUsername, hasReadonlyPassword: !!cfg.readonlyPasswordHash,
-    cidrs: cfg.extraAllowedCidrs, bonjour: cfg.bonjour, preventSleep: cfg.preventSleep
+    onStart() { void start(); },
+    onStop() { void stop(); },
+    onSave(form) { void save(form); },
+    getSettings: currentSettings
   });
   setInterval(() => view.setSleepState(sleepGuard.active, store.get().preventSleep), 2000);
   view.setStatus('已停止');

@@ -21,12 +21,14 @@
   input[type=number] { width:80px; }
   input[type=checkbox] { padding:0; }
   button { background:var(--acc); color:#fff; border:0; border-radius:6px; padding:5px 12px; font:inherit; cursor:pointer; }
-  button.sec { background:var(--card); color:var(--fg); border:1px solid var(--line); padding:2px 9px; }
+  button.sec { background:var(--card); color:var(--fg); border:1px solid var(--line); padding:5px 12px; }
   button:disabled { opacity:.45; cursor:not-allowed; }
   .notice { background:var(--warnbg); color:var(--warnfg); border-radius:8px; padding:8px 12px; margin:10px 0 0; display:flex; align-items:center; justify-content:space-between; gap:8px; }
   table { border-collapse:collapse; width:100%; }
   th, td { text-align:left; padding:3px 8px 3px 0; border-bottom:1px solid var(--line); }
   th { color:var(--mut); font-weight:500; }
+  /* 表格最后一行不画下边线：下一节（details）自带上边线，否则会叠成两条 */
+  tr:last-child th, tr:last-child td { border-bottom:none; }
   details { margin-top:14px; border-top:1px solid var(--line); padding-top:10px; }
   summary { cursor:pointer; font-weight:600; }
   pre { background:var(--card); border:1px solid var(--line); border-radius:6px; padding:8px; font:12px/1.5 ui-monospace, Menlo, monospace; max-height:170px; overflow:auto; white-space:pre-wrap; word-break:break-all; margin:6px 0 0; }
@@ -41,9 +43,6 @@
 <p class="mut" id="sleep" style="margin-top:0"></p>
 <div id="notices"></div>
 
-<h2>最近连接的客户端</h2>
-<table id="clients"><tbody><tr><td class="mut">（尚无连接）</td></tr></tbody></table>
-
 <details id="settings">
   <summary>设置</summary>
   <div class="grid" style="margin-top:10px">
@@ -57,8 +56,17 @@
       <label><input type="checkbox" id="nosleep"> 有连接时阻止休眠</label>
     </div>
   </div>
-  <p class="mut">修改设置后点「启动」（正在运行时先点「停止」）使其生效。密码留空表示不改。</p>
+  <p class="mut">密码留空表示不改。保存后服务会自动启动（正在运行则重启）以应用新设置。</p>
+  <div class="row">
+    <button id="btnSave" disabled>保存</button>
+    <button id="btnDiscard" class="sec" disabled>放弃</button>
+    <span class="mut" id="dirty"></span>
+  </div>
 </details>
+
+<h2>最近连接的客户端</h2>
+<table id="clients"><tbody><tr><td class="mut">（尚无连接）</td></tr></tbody></table>
+
 
 <details>
   <summary>最近请求</summary>

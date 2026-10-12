@@ -20,6 +20,15 @@ import { SleepGuard } from '../../src/util/sleepGuard';
 
 const basic = (s: string) => 'Basic ' + Buffer.from(s).toString('base64');
 
+test('配置里的端口：只接受 1024–65535（0 留给测试），其余回到默认', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ewdav-p-'));
+  const store = new ConfigStore(dir);
+  store.load();
+  for (const [input, want] of [[41600, 41600], [1024, 1024], [65535, 65535], [0, 0], [80, 41600], [1023, 41600], [65536, 41600], [-1, 41600], [8080.5, 41600]] as Array<[number, number]>) {
+    assert.strictEqual(store.update({ port: input }).port, want, String(input));
+  }
+});
+
 test('没设管理密码时不要求认证；设了则校验账号密码', () => {
   const a = new Authenticator();
   const none = { username: 'eagle', passwordHash: null };

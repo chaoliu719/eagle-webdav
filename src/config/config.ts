@@ -5,7 +5,7 @@ import * as path from 'path';
 export interface Config {
   /** 监听地址。默认仅本机，用户在状态窗口里选择局域网网卡后才对外。 */
   host: string;
-  /** 0 = 由系统分配临时端口（仅测试用；窗口里保存时要求 1–65535）。 */
+  /** 窗口里要求 1024–65535（1–1023 属系统保留端口，是否能监听取决于监听地址）。0 = 由系统分配临时端口，仅测试用。 */
   port: number;
   username: string;
   /** scrypt$N$salt(hex)$hash(hex)；null 表示尚未设置密码。 */
@@ -59,7 +59,7 @@ function sanitize(raw: unknown): Config {
   const port = Number(r.port);
   return {
     host: typeof r.host === 'string' && r.host ? r.host : d.host,
-    port: Number.isInteger(port) && port >= 0 && port < 65536 ? port : d.port,
+    port: Number.isInteger(port) && (port === 0 || (port >= 1024 && port < 65536)) ? port : d.port,
     username: typeof r.username === 'string' && r.username ? r.username : d.username,
     passwordHash: typeof r.passwordHash === 'string' && r.passwordHash ? r.passwordHash : null,
     tagsView: typeof r.tagsView === 'boolean' ? r.tagsView : d.tagsView,

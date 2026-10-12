@@ -105,7 +105,7 @@ let saving = false;
 async function save(form: SettingsForm): Promise<void> {
   if (saving) return;
   if (!form.username) return view.showFieldError('user', '账号不能为空');
-  if (!Number.isInteger(form.port) || form.port < 1 || form.port > 65535) return view.showFieldError('port', '端口应为 1 到 65535 之间的数字');
+  if (!Number.isInteger(form.port) || form.port < 1024 || form.port > 65535) return view.showFieldError('port', '端口应为 1024 到 65535 之间的数字');
 
   saving = true;
   view.setSaving(true);

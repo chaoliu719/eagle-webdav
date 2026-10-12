@@ -118,7 +118,7 @@ export class DavServer {
     s.on('clientError', (_e, sock) => {
       try { sock.end('HTTP/1.1 400 Bad Request\r\n\r\n'); } catch { /* ignore */ }
     });
-    // 与 Go net/http webdav 对齐，避免 Finder 卡顿（见 CLAUDE.md）
+    // 与 Go net/http webdav 对齐，避免 Finder 卡顿（见 docs/dev/eagle-api-notes.md）
     s.keepAliveTimeout = 0;
     s.requestTimeout = 0;
     s.headersTimeout = 30_000;

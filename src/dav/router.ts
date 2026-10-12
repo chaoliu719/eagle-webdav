@@ -28,7 +28,7 @@ const YIELD_EVERY = 500;
 const WARN_ENTRIES = 20000;
 
 const ALLOW_MISSING = 'OPTIONS, LOCK, PUT, MKCOL';
-// 与 Go net/http webdav 一致：集合不含 GET/HEAD（见 CLAUDE.md 的 Finder 卡顿修复）
+// 与 Go net/http webdav 一致：集合不含 GET/HEAD（见 docs/dev/eagle-api-notes.md 的 Finder 卡顿修复）
 const ALLOW_DIR = 'OPTIONS, LOCK, DELETE, PROPPATCH, COPY, MOVE, UNLOCK, PROPFIND';
 const ALLOW_FILE = 'OPTIONS, LOCK, GET, HEAD, POST, DELETE, PROPPATCH, COPY, MOVE, UNLOCK, PROPFIND, PUT';
 

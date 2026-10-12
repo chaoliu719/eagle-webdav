@@ -1,3 +1,5 @@
+<p align="center"><img src="plugin/logo.png" alt="Eagle WebDAV" width="128"></p>
+
 # Eagle WebDAV
 
 把 [Eagle](https://eagle.cool) 资源库以 WebDAV 暴露给 Finder、Infuse、rclone 等客户端的后台服务插件。插件内用 Node `http` 手写最小 WebDAV 服务，不依赖第三方 WebDAV 库。

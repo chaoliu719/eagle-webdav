@@ -58,6 +58,7 @@ Eagle 后台服务插件（`serviceMode: true`），插件内用 Node `http` 手
 
 - **防休眠**：只有传输类请求（GET / PUT / COPY / MOVE）才计入，PROPFIND / OPTIONS / LOCK / HEAD 不计；有传输时起 `caffeinate -i -w <进程号>`，最后一次传输结束再留 60s 才放开；`-w` 保证宿主退出后它也退出
 - **Bonjour**：`dns-sd -R "<名称>" _webdav._tcp local <端口>`，仅对局域网开放时注册；子进程在页面 `pagehide`、停止、退出时结束，启动时 `pkill -f 'dns-sd -R Eagle '` 清理遗留
+  - **卸载插件会留下孤儿 `dns-sd`（2026-10-12 真机实测）**：卸载直接结束宿主进程，`pagehide` / `onPluginBeforeExit` 都来不及跑，而 `dns-sd` 没有 `caffeinate -w` 那样的选项，会继续广播一个已不存在的服务（`caffeinate` 则正常随宿主退出）。现在每次注册都会起一个小看门狗（`sh` 循环，每 2 秒检查宿主进程与 `dns-sd`，任一消失就结束 `dns-sd`；`defaultWatchdog`，`src/util/bonjour.ts`），`stop()` 时一并结束；有单元测试。启动时的 `pkill` 清理仍保留，处理历史遗留
 - 连接设备按 User-Agent 识别；`198.18.0.0/15`（Surge 虚拟网卡）不列入监听地址下拉框
 
 ## 日志系统

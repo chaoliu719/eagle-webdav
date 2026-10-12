@@ -10,7 +10,7 @@ import { watchPending } from '../../src/dav/handlers/common';
 import { FakeEagleAdapter } from '../../src/eagle/fakeAdapter';
 import { Authenticator } from '../../src/http/auth';
 import { LibraryIndex } from '../../src/index/libraryIndex';
-import { Bonjour } from '../../src/util/bonjour';
+import { Bonjour, defaultWatchdog } from '../../src/util/bonjour';
 import { friendlyClient, summarizeClients } from '../../src/util/clients';
 import { RingLogger, type RequestEntry } from '../../src/util/log';
 import { SleepGuard } from '../../src/util/sleepGuard';
@@ -168,4 +168,21 @@ test('重复添加提示：给出提示，条目入库后自动撤销', async ()
   fake.items.push({ id: 'LATER000001', name: 'x', ext: 'jpg', size: 1, folders: [], tags: [], importedAt: 1, modifiedAt: 1, star: 0, annotation: '', url: '', filePath: '/x' });
   await new Promise((r) => setTimeout(r, 80));
   assert.strictEqual(logger.activeNotices().length, 0, '入库后撤销提示');
+});
+
+test('Bonjour 看门狗：宿主进程没了，dns-sd 子进程也会被结束（卸载插件时不留孤儿）', async () => {
+  const { spawn } = await import('child_process');
+  const parent = spawn('sleep', ['1'], { stdio: 'ignore' });
+  const kid = spawn('sleep', ['60'], { stdio: 'ignore' });
+  const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+  try {
+    defaultWatchdog(parent.pid!, kid.pid!);
+    assert.ok(alive(kid.pid!));
+    const t0 = Date.now();
+    while (alive(kid.pid!) && Date.now() - t0 < 8000) await new Promise((r) => setTimeout(r, 200));
+    assert.ok(!alive(kid.pid!), '宿主退出后子进程应被结束');
+  } finally {
+    try { kid.kill(); } catch { /* ignore */ }
+    try { parent.kill(); } catch { /* ignore */ }
+  }
 });

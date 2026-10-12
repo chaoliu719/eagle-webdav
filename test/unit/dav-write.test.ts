@@ -11,11 +11,12 @@ import { DavServer } from '../../src/http/server';
 import { LibraryIndex } from '../../src/index/libraryIndex';
 import { RingLogger } from '../../src/util/log';
 
-const PORT = 41696;
+// 端口由系统分配，避免与本机其他进程（含残留的测试进程）串线
+let PORT = 0;
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ewdav-w-'));
 const store = new ConfigStore(dir);
 store.load();
-store.update({ host: '127.0.0.1', port: PORT, username: 'u' });
+store.update({ host: '127.0.0.1', port: 0, username: 'u' });
 store.setPassword('p');
 
 const fake = new FakeEagleAdapter();
@@ -47,7 +48,7 @@ const names = async (p: string) => {
   return Array.from(r.body.matchAll(/<D:href>([^<]*)<\/D:href>/g)).map((m) => decodeURIComponent(m[1])).slice(1);
 };
 
-test('启动', async () => { await server.start(); });
+test('启动', async () => { await server.start(); PORT = server.listenInfo!.port; });
 
 test('PUT 新建 / 覆盖 / 约束', async () => {
   let r = await req('PUT', '/A/hello.txt', {}, 'hello');

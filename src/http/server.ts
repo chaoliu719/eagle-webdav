@@ -58,6 +58,8 @@ export class DavServer {
       primary.listen(cfg.port, cfg.host, () => { primary.off('error', reject); resolve(); });
     });
     this.servers.push(primary);
+    // 配置端口为 0（测试里用，由系统分配）时，取实际端口
+    const port = (primary.address() as { port: number } | null)?.port ?? cfg.port;
 
     let ipv6 = false;
     if (cfg.host === '0.0.0.0') {
@@ -65,13 +67,13 @@ export class DavServer {
       const s6 = this.create();
       ipv6 = await new Promise<boolean>((resolve) => {
         s6.once('error', (e) => { this.deps.logger.warn('IPv6 监听失败：' + e.message); resolve(false); });
-        s6.listen({ port: cfg.port, host: '::', ipv6Only: true }, () => resolve(true));
+        s6.listen({ port, host: '::', ipv6Only: true }, () => resolve(true));
       });
       if (ipv6) this.servers.push(s6);
     }
     primary.on('error', (e) => this.deps.logger.error('服务错误：' + e.message));
-    this.info = { host: cfg.host, port: cfg.port, ipv6 };
-    this.deps.logger.info(`已监听 ${cfg.host}:${cfg.port}${ipv6 ? '（含 IPv6）' : ''}`);
+    this.info = { host: cfg.host, port, ipv6 };
+    this.deps.logger.info(`已监听 ${cfg.host}:${port}${ipv6 ? '（含 IPv6）' : ''}`);
     return this.info;
   }
 

@@ -23,12 +23,7 @@
   button { background:var(--acc); color:#fff; border:0; border-radius:6px; padding:5px 12px; font:inherit; cursor:pointer; }
   button.sec { background:var(--card); color:var(--fg); border:1px solid var(--line); padding:2px 9px; }
   button:disabled { opacity:.45; cursor:not-allowed; }
-  code { background:var(--card); padding:1px 6px; border-radius:4px; user-select:all; }
   .notice { background:var(--warnbg); color:var(--warnfg); border-radius:8px; padding:8px 12px; margin:10px 0 0; display:flex; align-items:center; justify-content:space-between; gap:8px; }
-  .addr { display:flex; align-items:center; gap:8px; margin:4px 0; }
-  .qr { display:flex; gap:14px; align-items:flex-start; margin-top:10px; }
-  .qr .box { background:#fff; padding:6px; border-radius:8px; line-height:0; }
-  .qr svg { width:132px; height:132px; }
   table { border-collapse:collapse; width:100%; }
   th, td { text-align:left; padding:3px 8px 3px 0; border-bottom:1px solid var(--line); }
   th { color:var(--mut); font-weight:500; }
@@ -42,19 +37,9 @@
 <h1>Eagle WebDAV <span class="badge" id="state">未启动</span></h1>
 <p class="mut" id="status">加载中…</p>
 <div class="row"><button id="btnStart">启动</button><button id="btnStop" class="sec" disabled>停止</button></div>
+<p class="mut" id="discover" style="margin-bottom:0"></p>
+<p class="mut" id="sleep" style="margin-top:0"></p>
 <div id="notices"></div>
-
-<h2>连接地址</h2>
-<div id="addrs"><span class="mut">服务未启动</span></div>
-<div class="qr" id="qrwrap" hidden>
-  <div class="box" id="qr"></div>
-  <div>
-    <p class="mut" style="margin-top:0">用 iPad / iPhone 扫码，得到上面的地址，再填账号密码。</p>
-    <label>二维码地址 <select id="qrsel"></select></label>
-  </div>
-</div>
-<p class="mut" id="discover"></p>
-<p class="mut" id="sleep"></p>
 
 <h2>最近连接的客户端</h2>
 <table id="clients"><tbody><tr><td class="mut">（尚无连接）</td></tr></tbody></table>

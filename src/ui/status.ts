@@ -1,4 +1,3 @@
-import qrcode from 'qrcode-generator';
 import * as os from 'os';
 import { summarizeClients } from '../util/clients';
 import type { RingLogger } from '../util/log';
@@ -48,22 +47,6 @@ export interface InitialSettings {
   preventSleep: boolean;
 }
 
-function copyText(text: string): void {
-  const fallback = () => {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    try { document.execCommand('copy'); } catch { /* ignore */ }
-    ta.remove();
-  };
-  try {
-    void navigator.clipboard.writeText(text).catch(fallback);
-  } catch {
-    fallback();
-  }
-}
-
 function ago(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));
   if (s < 5) return '刚刚';
@@ -71,18 +54,8 @@ function ago(ms: number): string {
   return `${Math.round(s / 60)} 分钟前`;
 }
 
-/** 二维码：白底黑块（暗色模式下也要保证可扫），返回 SVG 字符串。 */
-export function qrSvg(text: string): string {
-  const qr = qrcode(0, 'M');
-  qr.addData(text);
-  qr.make();
-  return qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
-}
-
 export class StatusView {
   private lastRender = 0;
-  private urls: string[] = [];
-  private running = false;
   private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(private logger: RingLogger) {
@@ -122,7 +95,6 @@ export class StatusView {
       preventSleep: $<HTMLInputElement>('nosleep').checked
     }));
     $('btnStop').addEventListener('click', () => handlers.onStop());
-    $('qrsel').addEventListener('change', () => this.renderQr());
   }
 
   private updateHostWarning(): void {
@@ -136,15 +108,12 @@ export class StatusView {
     el.classList.toggle('warn', bad);
   }
 
-  setRunning(running: boolean, urls: string[] = []): void {
-    this.running = running;
-    this.urls = urls;
+  setRunning(running: boolean): void {
     $<HTMLButtonElement>('btnStart').disabled = running;
     $<HTMLButtonElement>('btnStop').disabled = !running;
     $('state').textContent = running ? '运行中' : '未启动';
     $('state').classList.toggle('on', running);
     for (const id of ['pass', 'ropass']) $<HTMLInputElement>(id).value = '';
-    this.renderAddresses();
   }
 
   setDiscovery(name: string | null): void {
@@ -155,45 +124,6 @@ export class StatusView {
 
   setSleepState(active: boolean, enabled: boolean): void {
     $('sleep').textContent = !enabled ? '' : active ? '正在阻止 Mac 休眠（有客户端连接中）。' : '有客户端连接时会阻止 Mac 休眠。';
-  }
-
-  private renderAddresses(): void {
-    const box = $('addrs');
-    box.textContent = '';
-    if (!this.urls.length) {
-      box.innerHTML = '<span class="mut">服务未启动</span>';
-      $('qrwrap').hidden = true;
-      return;
-    }
-    for (const u of this.urls) {
-      const row = document.createElement('div');
-      row.className = 'addr';
-      const code = document.createElement('code');
-      code.textContent = u;
-      const btn = document.createElement('button');
-      btn.className = 'sec';
-      btn.textContent = '复制';
-      btn.addEventListener('click', () => {
-        copyText(u);
-        btn.textContent = '已复制';
-        setTimeout(() => { btn.textContent = '复制'; }, 1200);
-      });
-      row.append(code, btn);
-      box.append(row);
-    }
-    // 二维码只给非回环地址（手机扫的必须是局域网地址）
-    const lan = this.urls.filter((u) => !/\/\/(127\.0\.0\.1|localhost)[:/]/.test(u));
-    const sel = $<HTMLSelectElement>('qrsel');
-    sel.textContent = '';
-    for (const u of lan) sel.add(new Option(u, u));
-    $('qrwrap').hidden = lan.length === 0;
-    this.renderQr();
-  }
-
-  private renderQr(): void {
-    const sel = $<HTMLSelectElement>('qrsel');
-    if (!sel.value) { $('qr').innerHTML = ''; return; }
-    $('qr').innerHTML = qrSvg(sel.value);
   }
 
   renderLog(force: boolean): void {

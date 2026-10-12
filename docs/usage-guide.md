@@ -17,14 +17,14 @@
 | 设备或工具 | 推荐用法 | 注意事项 |
 | --- | --- | --- |
 | Mac Finder | Command + K，输入 `http://Mac 的 IP:41600/`，填账号密码挂载 | 拖入的文件会导入 Eagle，资源库里是一份副本；改名、移动、复制会同步到 Eagle |
-| iPad、iPhone 看影音 | 用 Infuse：在「添加文件源」的发现列表里选这台 Mac，或扫插件窗口的二维码得到地址；建议用只读账号 | 支持 Range 拖进度条；mp4（索引在文件尾或头）、mkv 的跳转读取已用 ffmpeg 验证 |
+| iPad、iPhone 看影音 | 用 Infuse：在「添加文件源」的发现列表里选这台 Mac，或手动填 `http://Mac 的 IP:41600/`（IP 可在插件窗口「设置 → 监听地址」的下拉框里看到）；建议用只读账号 | 支持 Range 拖进度条；mp4（索引在文件尾或头）、mkv 的跳转读取已用 ffmpeg 验证 |
 | iPad、iPhone 管文件 | 用提供文件提供者的第三方 WebDAV App | 「文件」App 的「连接服务器」原生似乎只支持 SMB；局域网地址可用 HTTP |
 | rclone 与脚本 | `rclone config` 选 webdav，vendor 选 other；`rclone ls`、`copy`、`check` | 已验证 lsd/ls/copy/check，可按文件夹结构导出备份 |
 | Windows | 不建议作主力 | 默认禁用 HTTP 上的 Basic 认证，单文件默认上限约 50 MB，WebClient 服务已被官方标为弃用 |
 
 ## 状态窗口与账号
 
-- 插件窗口里有连接地址（一键复制）、二维码（手机扫码得到地址）、最近连接的客户端和提示横幅。
+- 插件窗口里有启动状态、自动发现与防休眠的状态说明、最近连接的客户端和提示横幅。
 - 两个账号：**管理账号**（默认用户名 `eagle`）可读写；**只读账号**（默认用户名 `viewer`）只能看，适合给 Infuse、电视、iPad，不用担心误删。两个密码都在「设置」里改，初次生成的随机密码在 `~/Library/Application Support/Eagle/eagle-webdav/password.txt`。
 - **自动发现（Bonjour）**：Infuse 等 App 的 WebDAV 发现列表里会出现这台 Mac，不用手输地址。Finder 的「网络」不会列出 WebDAV，Finder 仍要按 ⌘K 输入地址。
 - **阻止休眠**：有客户端连接时自动阻止 Mac 休眠，空闲后放开。

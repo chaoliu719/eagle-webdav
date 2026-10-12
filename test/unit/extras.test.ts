@@ -13,7 +13,6 @@ import { FakeEagleAdapter } from '../../src/eagle/fakeAdapter';
 import { Authenticator } from '../../src/http/auth';
 import { DavServer } from '../../src/http/server';
 import { LibraryIndex } from '../../src/index/libraryIndex';
-import { qrSvg } from '../../src/ui/status';
 import { Bonjour } from '../../src/util/bonjour';
 import { friendlyClient, summarizeClients } from '../../src/util/clients';
 import { RingLogger, type RequestEntry } from '../../src/util/log';
@@ -178,10 +177,4 @@ test('重复添加提示：给出提示，条目入库后自动撤销', async ()
   fake.items.push({ id: 'LATER000001', name: 'x', ext: 'jpg', size: 1, folders: [], tags: [], importedAt: 1, modifiedAt: 1, star: 0, annotation: '', url: '', filePath: '/x' });
   await new Promise((r) => setTimeout(r, 80));
   assert.strictEqual(logger.activeNotices().length, 0, '入库后撤销提示');
-});
-
-test('二维码：生成白底 SVG', () => {
-  const svg = qrSvg('http://192.168.0.103:41600/');
-  assert.match(svg, /^<svg/);
-  assert.ok(svg.length > 500);
 });

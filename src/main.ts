@@ -8,7 +8,7 @@ import { DavRouter } from './dav/router';
 import { parseCidr } from './http/access';
 import { DavServer } from './http/server';
 import { LibraryIndex } from './index/libraryIndex';
-import { StatusView, lanAddresses } from './ui/status';
+import { StatusView } from './ui/status';
 import { Bonjour } from './util/bonjour';
 import { RingLogger } from './util/log';
 import { SleepGuard } from './util/sleepGuard';
@@ -37,13 +37,6 @@ logger.onNotice = (n) => {
 };
 const view = new StatusView(logger);
 
-function urlsFor(host: string, port: number): string[] {
-  if (host === '0.0.0.0') {
-    return ['127.0.0.1', ...lanAddresses().map((a) => a.address)].map((h) => `http://${h}:${port}/`);
-  }
-  return [`http://${host}:${port}/`];
-}
-
 async function start(): Promise<void> {
   const app = adapter.appInfo();
   // build 读不到（0）时无法判断，放行并留下日志
@@ -54,7 +47,7 @@ async function start(): Promise<void> {
   try {
     const info = await server.start();
     const lib = await adapter.libraryInfo().catch(() => null);
-    view.setRunning(true, urlsFor(info.host, info.port));
+    view.setRunning(true);
     // 只在对局域网开放时才广播；仅本机监听没有意义
     const cfg = store.get();
     const discoverable = cfg.bonjour && info.host !== '127.0.0.1' && info.host !== '::1';

@@ -17,8 +17,5 @@
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
   },
-  "license": "MIT",
-  "dependencies": {
-    "qrcode-generator": "^2.0.4"
-  }
+  "license": "MIT"
 }

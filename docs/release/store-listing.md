@@ -1,6 +1,6 @@
 # 插件中心上架材料
 
-提交时按下面的内容填写。字数限制来自官方《Store Listing Copy》：名称 ≤ 30 个字符且 ≤ 6 个词；简短描述英文 ≤ 200、简体中文 ≤ 100。封面图在 `docs/store/`（1600×1000，三种语言各一张，内容来自真实窗口的预览页面）。
+提交时按下面的内容填写。字数限制来自官方《Store Listing Copy》：名称 ≤ 30 个字符且 ≤ 6 个词；简短描述英文 ≤ 200、简体中文 ≤ 100。封面图在 `docs/release/store/`（1600×1000，三种语言各一张，内容来自真实窗口的预览页面）。
 
 提交前必须做的事（官方清单）：
 1. 用 Eagle 自己的「打包插件」导出 `.eagleplugin`（插件面板里右键该插件 → 打包插件），不要上传 `npm run package` 的产物。
@@ -118,4 +118,4 @@ Eagle 的資料夾就是目錄。不屬於任何資料夾的素材在 `@未分�
 ## 图标与封面
 
 - 图标：`plugin/logo.png`（256×256，透明圆角）。
-- 封面：`docs/store/cover-en.png`、`cover-zh_CN.png`、`cover-zh_TW.png`（1600×1000）。封面里的窗口截图来自真实界面页面，数据是演示用的（库名 Photo Library、三个示例客户端）。
+- 封面：`docs/release/store/cover-en.png`、`cover-zh_CN.png`、`cover-zh_TW.png`（1600×1000）。封面里的窗口截图来自真实界面页面，数据是演示用的（库名 Photo Library、三个示例客户端）。

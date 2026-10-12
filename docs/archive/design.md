@@ -1,18 +1,18 @@
-> **实测修正（Eagle 4.0.0 Build 23）**：本文写于真机验证之前，下列几处已被实测推翻或改变，以仓库根目录 [CLAUDE.md](../CLAUDE.md) 为准。
+> **实测修正（Eagle 4.0.0 Build 23）**：本文写于真机验证之前，下列几处已被实测推翻或改变，**本文已归档，仅作历史参考**；以 [Eagle API 实测笔记](../dev/eagle-api-notes.md)、[架构](../dev/architecture.md) 与 [产品决策](../dev/decisions.md) 为准。
 >
 > | 本文说法 | 实测结论 |
 > | --- | --- |
 > | `item.get` 带 `fields` 可减小开销（6.1 节） | 带 `fields` 时 `importedAt` / `modifiedAt` 会变成 0，列表查询不用 `fields` |
 > | 未分类用 `item.get({isUnfiled: true, fields})` | `{isUnfiled: true}` 正确；`{folders: []}` 等于不过滤 |
 > | 新导入条目有可用的 `modifiedAt`，ETag 取 id-modifiedAt-size | 新导入为 0 且 `replaceFile` 不更新；取 `modifiedAt \|\| importedAt` 再叠加本服务的替换时间 |
-> | 导入后条目名与请求名一致 | 导入时 Eagle 会删掉 `: ? * " < > \ \| %`、emoji 等；服务按同规则匹配（见 CLAUDE.md） |
+> | 导入后条目名与请求名一致 | 导入时 Eagle 会删掉 `: ? * " < > \ \| %`、emoji 等；服务按同规则匹配（见 [Eagle API 实测笔记](../dev/eagle-api-notes.md)） |
 > | 重名消歧后即可 | 内容相同的导入会触发 Eagle「重复添加提示」，需人工确认 |
 > | 5.11：永不拒绝加锁 | 已按此实现（旧版实现曾返回 423，已改） |
 > | 4.1：根目录 PUT | 根目录不能放条目，PUT 返回 403 |
 > | 8.2：`keepAliveTimeout` 65 秒 | 与 Go net/http webdav 对齐，`keepAliveTimeout = 0`，否则 Finder 卡顿 60–90 秒 |
 > | 6.2：后台轮询变更 | 改为按请求惰性检查 `library.info().modificationTime`，无独立轮询 |
-> | 8.1：`src/dav/handlers/*.ts` 等 | 实际目录见 README |
-> | 8.3：manifest `name` 为 "Eagle WebDAV" | 现为 `{{manifest.app.name}}`，名字在 `plugin/_locales/`（「WebDAV 共享」）；见 CLAUDE.md「命名」 |
+> | 8.1：`src/dav/handlers/*.ts` 等 | 实际目录见 [架构](../dev/architecture.md) |
+> | 8.3：manifest `name` 为 "Eagle WebDAV" | 现为 `{{manifest.app.name}}`，名字在 `plugin/_locales/`（「WebDAV 共享」）；见 [产品决策](../dev/decisions.md)「命名」 |
 > | 只读账号、额外允许的来源网段 | 已按产品决策整体删除；管理密码留空 = 不认证 |
 
 # Eagle WebDAV 后台服务插件：调研结论与详细设计文档

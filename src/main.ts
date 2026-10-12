@@ -97,8 +97,10 @@ async function save(form: SettingsForm): Promise<void> {
   saving = true;
   view.setSaving(true);
   try {
-    if (form.password) store.setPassword(form.password);
-    if (form.readonlyPassword) store.setReadonlyPassword(form.readonlyPassword);
+    if (form.password === '') store.update({ passwordHash: null });
+    else if (form.password !== null) store.setPassword(form.password);
+    if (form.readonlyPassword === '') store.update({ readonlyPasswordHash: null });
+    else if (form.readonlyPassword !== null) store.setReadonlyPassword(form.readonlyPassword);
     store.update({
       host: form.host, port: form.port, username: form.username,
       readonlyUsername: form.readonlyUsername || 'viewer',

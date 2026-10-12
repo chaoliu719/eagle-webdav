@@ -19,7 +19,7 @@ const stubs = `
   const fs = { readFileSync: (p) => (withPw && /config\\.json$/.test(p) ? fakeCfg : enoent()), writeFileSync: (p, d) => { window.__saved = String(d); }, mkdirSync: noop, renameSync: noop, rmSync: noop, statSync: enoent, promises: new Proxy({}, { get: () => async () => undefined }) };
   const path = { join: (...p) => p.join('/').replace(/\\/+/g, '/'), dirname: (p) => p.split('/').slice(0, -1).join('/') || '/', basename: (p) => p.split('/').pop(), extname: (p) => { const m = /\\.[^./]+$/.exec(p); return m ? m[0] : ''; }, sep: '/' };
   const os = { homedir: () => '/Users/preview', tmpdir: () => '/tmp', hostname: () => 'preview-mac.local', networkInterfaces: () => ({ en0: [{ family: 'IPv4', address: '192.168.0.103', internal: false }], lo0: [{ family: 'IPv4', address: '127.0.0.1', internal: true }] }) };
-  const crypto = { randomUUID: () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, () => ((Math.random() * 16) | 0).toString(16)), createHash: () => ({ update() { return this; }, digest: () => new Uint8Array(32) }), timingSafeEqual: () => true };
+  const crypto = { randomUUID: () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, () => ((Math.random() * 16) | 0).toString(16)), randomBytes: () => ({ toString: () => '00' }), scryptSync: () => ({ toString: () => '00' }), createHash: () => ({ update() { return this; }, digest: () => new Uint8Array(32) }), timingSafeEqual: () => true };
   window.__listens = [];
   const http = {
     createServer: () => { const s = new Emitter(); s.listen = (...a) => { const cb = a[a.length - 1]; window.__listens.push(a[0]); if (typeof cb === 'function') setTimeout(cb, 0); }; s.close = (cb) => cb && cb(); s.address = () => ({ address: '0.0.0.0', port: 0 }); return s; }

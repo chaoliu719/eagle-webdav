@@ -22,9 +22,10 @@ export interface SettingsForm {
   host: string;
   port: number;
   username: string;
-  password: string;
+  /** 密码：null = 不修改；'' = 清除；其他 = 设置为该值。 */
+  password: string | null;
   readonlyUsername: string;
-  readonlyPassword: string;
+  readonlyPassword: string | null;
   cidrs: string[];
   bonjour: boolean;
   preventSleep: boolean;
@@ -54,7 +55,7 @@ export interface InitialSettings {
 
 /**
  * 已设置的密码用一串黑点表示（真实密码不会回显，这里只是占位值）。
- * 用户点进去会全选，直接输入即替换；不改动则保存时视为「不修改」。
+ * 黑点 = 不修改；清空 = 清除密码；输入新内容 = 设置新密码。点进去会全选，直接输入即替换。
  */
 const MASK = '•'.repeat(10);
 
@@ -94,9 +95,8 @@ export class StatusView {
 
     for (const id of ['pass', 'ropass']) {
       const el = $<HTMLInputElement>(id);
-      // 点进去全选黑点，直接输入就是替换；清空后离开则恢复黑点（密码仍然存在）
+      // 点进去全选黑点，直接输入就是替换；清空则表示清除密码（点「放弃」可恢复）
       el.addEventListener('focus', () => { if (el.value === MASK) el.select(); });
-      el.addEventListener('blur', () => { if (!el.value && el.dataset.isSet) el.value = MASK; });
     }
     $('btnStart').addEventListener('click', () => handlers.onStart());
     $('btnStop').addEventListener('click', () => handlers.onStop());
@@ -126,10 +126,12 @@ export class StatusView {
     el.dataset.isSet = isSet ? '1' : '';
   }
 
-  /** 密码框的值：黑点占位或空都表示「不修改」。 */
-  private passwordValue(id: string): string {
-    const v = $<HTMLInputElement>(id).value;
-    return v === MASK ? '' : v;
+  /** 密码框的意图：null = 不修改（黑点，或本来就没设置且仍为空）；'' = 清除；其他 = 新密码。 */
+  private passwordValue(id: string): string | null {
+    const el = $<HTMLInputElement>(id);
+    if (el.value === MASK) return null;
+    if (el.value === '' && !el.dataset.isSet) return null;
+    return el.value;
   }
 
   private readForm(): SettingsForm {

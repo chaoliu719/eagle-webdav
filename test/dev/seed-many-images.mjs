@@ -22,7 +22,13 @@ function png(rgb) {
   const raw = Buffer.concat(Array.from({ length: h }, () => row));
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 }
-const call = (method, p, body) => fetch(base + enc(p), { method, headers: auth, body });
+// 连接被掐断（Eagle 忙或插件重启）时退避重试，最多等约一分钟
+async function call(method, p, body) {
+  for (let n = 0; ; n++) {
+    try { return await fetch(base + enc(p), { method, headers: auth, body }); }
+    catch (e) { if (n >= 12) throw e; await new Promise((r) => setTimeout(r, 1000 * Math.min(n + 1, 5))); }
+  }
+}
 
 for (const p of ['/__e2e__', DIR]) {
   const r = await call('MKCOL', p);

@@ -51,7 +51,7 @@ async function start(): Promise<void> {
     // 只在对局域网开放时才广播；仅本机监听没有意义
     const cfg = store.get();
     const discoverable = cfg.bonjour && info.host !== '127.0.0.1' && info.host !== '::1';
-    view.setDiscovery(discoverable && bonjour.start(info.port) ? bonjour.name : null);
+    if (discoverable) bonjour.start(info.port);
     if (adapter instanceof RealEagleAdapter) {
       adapter.diagnose().then((ls) => ls.forEach((l) => logger.info(l)), (e: Error) => logger.warn('形态自检失败：' + e.message));
     }
@@ -68,7 +68,6 @@ async function start(): Promise<void> {
 async function stop(): Promise<void> {
   bonjour.stop();
   sleepGuard.release();
-  view.setDiscovery(null);
   await server.stop();
   view.setRunning(false);
   view.setStatus('已停止');

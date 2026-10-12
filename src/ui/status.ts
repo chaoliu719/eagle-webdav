@@ -153,12 +153,6 @@ export class StatusView {
     $('state').classList.toggle('on', running);
   }
 
-  setDiscovery(name: string | null): void {
-    $('discover').textContent = name
-      ? `自动发现已开启：Infuse 等 App 的 WebDAV 发现列表里会出现「${name}」。Finder 不会列出，请用 ⌘K 输入地址。`
-      : '自动发现未开启。';
-  }
-
   setSleepState(active: boolean, enabled: boolean): void {
     $('sleep').textContent = enabled && active ? '正在阻止 Mac 休眠（有客户端连接中）。' : '';
   }

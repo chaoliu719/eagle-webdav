@@ -12,6 +12,8 @@
 > | 8.2：`keepAliveTimeout` 65 秒 | 与 Go net/http webdav 对齐，`keepAliveTimeout = 0`，否则 Finder 卡顿 60–90 秒 |
 > | 6.2：后台轮询变更 | 改为按请求惰性检查 `library.info().modificationTime`，无独立轮询 |
 > | 8.1：`src/dav/handlers/*.ts` 等 | 实际目录见 README |
+> | 8.3：manifest `name` 为 "Eagle WebDAV" | 现为 `{{manifest.app.name}}`，名字在 `plugin/_locales/`（「WebDAV 共享」）；见 CLAUDE.md「命名」 |
+> | 只读账号、额外允许的来源网段 | 已按产品决策整体删除；管理密码留空 = 不认证 |
 
 # Eagle WebDAV 后台服务插件：调研结论与详细设计文档
 

@@ -62,18 +62,13 @@ PUT 先写影子暂存区，`addFromPath` 加 20s 超时；超时返回 `415` �
 - 重复添加提示：`importAt` 后按**目录列表**确认条目是否出现（`getById` 在弹提示时就已能返回条目，不能用来判断）；没出现就给横幅并用 `eagle.notification.show` 通知，后台每 5s 轮询，入库后自动撤销，10 分钟放弃。实测 Eagle 把多个重复提示合并处理时可能丢掉后面的导入
 
 ## 仍未验证
-Infuse 与 iPad 实机、Finder 图形界面的拖拽、几十万条的真实大库、litmus 协议合规测试、跨设备 LAN 访问（只在本机经局域网 IP 测过）、NFC/NFD 磁盘文件名归一化（服务端按 NFC 匹配路径，已用 NFD 请求验证）。
+Infuse 与 iPad 实机、Finder 图形界面的拖拽、几十万条的真实大库、跨设备 LAN 访问（只在本机经局域网 IP 测过）、NFC/NFD 磁盘文件名归一化（服务端按 NFC 匹配路径，已用 NFD 请求验证）。
 
 ## 发布与维护
 - 版本 1.0.0；`npm run package` 生成 `dist/eagle-webdav-<版本>.eagleplugin` 与同内容的 `.zip`（实测 Eagle「打包插件」产物就是 plugin/ 内容的 zip，文件名 `Eagle WebDAV.eagleplugin`，生成在项目根目录，已 gitignore）。**安装流程已真机验证**：`open dist/eagle-webdav-<版本>.eagleplugin`（双击同理）→ Eagle 弹出「Install eagle-webdav-<版本>?」→ 点 Install → 装到 `~/Library/Application Support/Eagle/Plugins/EAGLEWEBDAV01`，`runAfterInstall` 使服务立即自启并沿用 `eagle-webdav/config.json`；「开发」标签里的「卸载」只移除登记，不删项目源码，也不删配置目录；`npm run check` = 类型检查 + 单元测试 + 构建；CI 见 `.github/workflows/ci.yml`
 - `plugin/manifest.json` 的 `devTools` 现为 `false`。开发调试时临时改成 `true` 可弹出开发者工具（控制台可 `location.reload()`）；不开 DevTools 时，用 Eagle 工具栏「插件 → 开发」标签里该插件右侧「…」菜单的「重新加载」，并改完 manifest 后需重新加载才生效
 
-## 工作约定
-- 每完成一个阶段性工作就提交一次 git（提交信息用中文，带 Co-Authored-By），并把新的结论、约定同步记入本文件
-- 与用户用中文交流，中文标点用全角，中英文和数字之间加空格；不用画图讲解；需要确认时用文字直接问
-- M0 探针（`probe/`）已删除，历史在 git 里（最后一次存在于提交 `a8ba0f8` 及之前）；其协议细节已并入 `src/`，协议测试已被 `test/unit/` 取代
-- 在真机验证前，不要假设 Eagle API 存在某方法；先查本文件的实测事实
-- 构建与测试：`npm run build`、`npm run typecheck`、`npm test`（tsx + node:test，`test/unit/`）
+## 补充笔记（实测与实现）
 - 脚本加载瞬间 `eagle.app` 的 version、build、userDataPath 读不到（曾显示 Build 0），初始化要等 `onPluginCreate`，build 读不到时不拦截启动
 - 真机核对结果（Eagle 4.0.0 Build 23）：`eagle.app.userDataPath` 存在（`~/Library/Application Support/Eagle`，配置放其下 `eagle-webdav/`），但要等 `onPluginCreate`；`folder.getAll()` 返回的元素带 `children`，Folder 成员有 `createdAt`、`parent`、`children`、`description`、`icon`、`iconColor`；Item 成员还有 `palettes`、`comments`、`metadataFilePath`、`noThumbnail`、`noPreview`；**`item.get` 带 `fields` 时 `importedAt` / `modifiedAt` 会变成 0**（`getById` 与不带 fields 的 `get` 才是真值，毫秒时间戳），所以列表不用 fields；`item.get({folders:[id]})` 按直属条目工作正常；未分类 = 取全库再过滤（大库慢，M4 优化）
 - M3 真机实测：PUT 新建约 40ms；`replaceFile` 后 size 与 modifiedAt 更新、ETag 随之变化；改 `item.name` + `save()` 真实重命名磁盘文件；`item.folders` 增量改写生效；`moveToTrash` 后条目从所有文件夹消失。**内容与库内已有文件相同的导入（含 COPY 改名的真复制）会弹「重复添加提示」，导入要等人点确认才真正入库，`addFromPath` 却立即返回 id**——服务返回 201，但条目暂不可见，日志会警告；无法自动化绕过。`createFolder` 没有对应的删除 API，测试留下的 `__webdav_test_*` 文件夹需手动删除
@@ -91,3 +86,10 @@ Infuse 与 iPad 实机、Finder 图形界面的拖拽、几十万条的真实大
 - 联调：不依赖 Eagle 用 `npx tsx test/dev/fake-server.ts` 起假数据服务；命令行 `mount_webdav` 带 URL 凭据会返回 22，改用 `osascript -e 'mount volume "http://127.0.0.1:41600/" as user name "eagle" with password "..."'`（走 NetFS，与 Finder 一致）；重载插件页面可在其 DevTools 控制台执行 `location.reload()`（屏幕锁定时 GUI 操作不可用）
 - 源码：`src/{config,http,eagle,util,ui}`；只有 `src/eagle/realAdapter.ts` 可直接碰全局 `eagle`；`eagle.app.userDataPath` 未实测，缺失时回退到 `~/.eagle-webdav`
 - 与 rclone 对照：`npx tsx test/dev/fake-server.ts` 起假数据服务后用 rclone 联调
+
+## 工作约定
+- 每完成一个阶段性工作就提交一次 git（提交信息用中文，带 Co-Authored-By），并把新的结论、约定同步记入本文件
+- 与用户用中文交流，中文标点用全角，中英文和数字之间加空格；不用画图讲解；需要确认时用文字直接问
+- M0 探针（`probe/`）已删除，历史在 git 里（最后一次存在于提交 `a8ba0f8` 及之前）；其协议细节已并入 `src/`，协议测试已被 `test/unit/` 取代
+- 在真机验证前，不要假设 Eagle API 存在某方法；先查本文件的实测事实
+- 构建与测试：`npm run build`、`npm run typecheck`、`npm test`（tsx + node:test，`test/unit/`）

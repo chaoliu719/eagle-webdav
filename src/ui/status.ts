@@ -160,7 +160,7 @@ export class StatusView {
   }
 
   setSleepState(active: boolean, enabled: boolean): void {
-    $('sleep').textContent = !enabled ? '' : active ? '正在阻止 Mac 休眠（有客户端连接中）。' : '有客户端连接时会阻止 Mac 休眠。';
+    $('sleep').textContent = enabled && active ? '正在阻止 Mac 休眠（有客户端连接中）。' : '';
   }
 
   renderLog(force: boolean): void {

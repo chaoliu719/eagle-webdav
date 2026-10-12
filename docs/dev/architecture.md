@@ -23,8 +23,9 @@ Eagle 后台服务插件（`serviceMode: true`），插件内用 Node `http` 手
 ## 虚拟路径模型
 
 - Eagle 文件夹树即目录树；根目录另有虚拟目录 `@未分类`（可写）、`@全部`（平铺全库，只能新增，配置 `allView`，仅配置文件）。根目录不能放条目，PUT 返回 403
-- `@全部` 的写规则集中在 `isAllView`（`src/vfs/resolver.ts`，含经它看到的条目，`viaView`）与 `folderIdOf`（`all` 和 `uncat` 一样返回 null = 新增落在未分类）：PUT 新文件放行、已有条目 403；MKCOL / DELETE / PROPPATCH / MOVE（进、出都算）403；COPY 进来：同名同一条目 204 不做事，换名走「真复制」落未分类，撞上别的条目 403；可从中 COPY 出来。LOCK 对不存在的路径照常建占位（Finder 的 0 字节 → LOCK → 内容序列在 `@全部` 里也能走通）。全部语义对照表见 `docs/user/library-behavior.md`
-- 条目 DELETE = 整个条目移入回收站；文件夹 DELETE 返回 403
+- `@全部` 的写规则：`isAllView`（`src/vfs/resolver.ts`，含经它看到的条目，`viaView`）与 `folderIdOf`（`all` 和 `uncat` 一样返回 null = 新增落在未分类）。只有 MKCOL 在 `@全部` 里 403；MOVE 到 `@未分类` 403；COPY 进来同名同一条目 204 / 撞上别的条目 403；其余和 `@未分类` 一样。LOCK 对不存在的路径照常建占位。完整对照表见 `docs/user/library-behavior.md`
+- 删除统一走 `removeItemAt`（`src/dav/handlers/common.ts`）：路径在文件夹里且条目还属于别的文件夹 → 只移除该归属；其余整个进回收站。DELETE 与覆盖式 MOVE/COPY 清理目标都用它
+- 条目 DELETE 见上（`removeItemAt`）；文件夹 DELETE 返回 403
 - 同名消歧：后来的加「 ~ID末6位」后缀；旧路径仍可访问（冲突键索引）
 - 目录名 `@未分类` `@全部` 不翻译
 - PROPFIND `Depth: infinity` 返回 403 `propfind-finite-depth`

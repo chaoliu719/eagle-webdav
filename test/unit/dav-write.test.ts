@@ -136,17 +136,28 @@ test('MKCOL', async () => {
   assert.strictEqual((await req('MKCOL', '/@未分类/z')).status, 403);
 });
 
-test('DELETE：条目进回收站（一删全删），文件夹 403', async () => {
+test('DELETE 与 Eagle 一致：多归属条目在文件夹里只是从该文件夹移除；只剩一个归属时进回收站；文件夹 403', async () => {
   fake.addItem('multi', 'txt', 'm', [A.id, B.id]);
   index.invalidate();
   assert.ok((await names('/B')).includes('/B/multi.txt'));
   assert.strictEqual((await req('DELETE', '/A/multi.txt')).status, 204);
-  assert.ok(!(await names('/B')).includes('/B/multi.txt'));
-  assert.strictEqual(fake.trashed.length, 1);
+  assert.ok((await names('/B')).includes('/B/multi.txt'), '另一个文件夹里还在');
+  assert.ok(!(await names('/A')).includes('/A/multi.txt'));
+  assert.strictEqual(fake.trashed.length, 0, '没有进回收站');
   assert.strictEqual((await req('DELETE', '/A/multi.txt')).status, 404);
+  assert.strictEqual((await req('DELETE', '/B/multi.txt')).status, 204, '只剩一个归属了');
+  assert.strictEqual(fake.trashed.length, 1);
   const r = await req('DELETE', '/A/sub');
   assert.strictEqual(r.status, 403);
   assert.ok(r.body.includes('不提供删除文件夹'));
+});
+
+test('DELETE：未分类里的条目整个进回收站', async () => {
+  fake.addItem('lonely', 'txt', 'l', []);
+  index.invalidate();
+  const before = fake.trashed.length;
+  assert.strictEqual((await req('DELETE', '/@未分类/lonely.txt')).status, 204);
+  assert.strictEqual(fake.trashed.length, before + 1);
 });
 
 test('MOVE 条目：改名、跨目录（增量改 folders）、扩展名只读、Overwrite', async () => {

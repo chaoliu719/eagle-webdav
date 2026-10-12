@@ -1,16 +1,16 @@
 import type * as http from 'http';
 import { send } from '../../http/respond';
-import { isAllView, pathKey } from '../../vfs/resolver';
+import { pathKey } from '../../vfs/resolver';
 import { writePreconditionFailed } from '../conditional';
 import type { DavContext } from '../context';
 import { etagOf } from '../props';
+import { removeItemAt } from './common';
 
 export async function handleDelete(ctx: DavContext, req: http.IncomingMessage, res: http.ServerResponse, segs: string[]): Promise<void> {
   req.resume();
   const r = await ctx.resolver.resolve(segs);
   if (!r) return send(res, 404, {}, 'Not Found');
   if (r.kind === 'item' && writePreconditionFailed(req.headers, etagOf(ctx.index.normalize(r.item)))) return send(res, 412, {}, 'Precondition Failed');
-  if (isAllView(r)) return send(res, 403, {}, '「@全部」是平铺视图，只能新增文件，不能覆盖、删除、改名、移动或修改；请到文件所在的文件夹或 @未分类 里操作');
   switch (r.kind) {
     case 'shadow':
       ctx.shadow.remove(pathKey(r.segs));
@@ -19,10 +19,10 @@ export async function handleDelete(ctx: DavContext, req: http.IncomingMessage, r
     case 'item': {
       const id = r.item.id;
       try {
-        // 「一删全删」：条目属于多个文件夹时，会从所有文件夹消失
-        await ctx.mutex.run(id, () => ctx.adapter.trashItem(id));
+        // 与 Eagle 一致：多归属条目在文件夹里删除只是从该文件夹移除，其余情况整个进回收站（见 removeItemAt）
+        await removeItemAt(ctx, r);
       } catch (e) {
-        ctx.logger.error(`移入回收站失败 ${id}：${(e as Error).message}`);
+        ctx.logger.error(`删除失败 ${id}：${(e as Error).message}`);
         return send(res, 500, {}, '删除失败');
       }
       ctx.index.invalidate();

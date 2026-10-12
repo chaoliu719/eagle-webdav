@@ -11,7 +11,7 @@ export interface Config {
   username: string;
   /** scrypt$N$salt(hex)$hash(hex)；null 表示尚未设置密码。 */
   passwordHash: string | null;
-  /** 是否暴露只读的「@全部」视图（平铺列出全库条目）。只在配置文件里改，窗口里没有开关。 */
+  /** 是否暴露「@全部」视图（平铺列出全库条目）。只在配置文件里改，窗口里没有开关。 */
   allView: boolean;
   /** Eagle 启动后自动监听。 */
   autoStart: boolean;

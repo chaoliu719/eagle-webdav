@@ -23,6 +23,27 @@ export function unusableItemName(name: string): boolean {
 
 export function parentSegsOf(segs: string[]): string[] { return segs.slice(0, -1); }
 
+/**
+ * 「删除」经由某个路径看到的条目，规则与 Eagle 界面一致（2026-10-12 真机实测）：
+ * - 在文件夹里、且条目还属于别的文件夹：只从这个文件夹移除（对应 Eagle 弹窗的默认选项「仅从当前文件夹移除」），不进回收站
+ * - 其余情况（只属于这一个文件夹、在「@未分类」里、在「@全部」里）：整个进回收站
+ */
+export async function removeItemAt(ctx: DavContext, r: Extract<Resolved, { kind: 'item' }>): Promise<'trashed' | 'unlinked'> {
+  const id = r.item.id;
+  const folderId = r.parentFolderId;
+  return ctx.mutex.run(id, async (): Promise<'trashed' | 'unlinked'> => {
+    if (folderId !== null) {
+      const fresh = await ctx.adapter.getItemFile(id);
+      if (fresh && fresh.folders.length > 1 && fresh.folders.includes(folderId)) {
+        await ctx.adapter.updateItem(id, { folders: fresh.folders.filter((f) => f !== folderId) });
+        return 'unlinked';
+      }
+    }
+    await ctx.adapter.trashItem(id);
+    return 'trashed';
+  });
+}
+
 /** 目标父目录对应的文件夹 id：真实文件夹返回 id，「@未分类」「@全部」（新增的文件落在未分类）返回 null，其他不可放条目返回 undefined。 */
 export function folderIdOf(parent: Resolved): string | null | undefined {
   if (parent.kind === 'folder') return parent.folder.id;

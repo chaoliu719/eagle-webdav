@@ -11,7 +11,7 @@ import type { DavContext } from '../context';
 import { etagOf } from '../props';
 import { safeLibraryFile } from '../safeFile';
 import { parseRequestPath } from '../path';
-import { folderIdOf, importAt, unusableItemName, makeTmpDir, parentSegsOf, removeDir, splitExt } from './common';
+import { folderIdOf, importAt, removeItemAt, unusableItemName, makeTmpDir, parentSegsOf, removeDir, splitExt } from './common';
 
 /** 解析 Destination 头；主机与本服务不一致返回 'foreign'。 */
 function parseDestination(req: http.IncomingMessage): string[] | 'bad' | 'foreign' {
@@ -55,9 +55,10 @@ export async function handleTransfer(
 
   const destParent = await ctx.resolver.resolve(parentSegsOf(destSegs));
   if (!destParent || !isCollection(destParent)) return send(res, 409, {}, '目标父目录不存在');
-  // 「@全部」：MOVE（含改名）进来或出去都拒绝；COPY 进来 = 新增一份落在未分类的新素材，
-  // 目标同名且就是源条目本身时什么都不用做（它本来就在这里），目标是别的条目则不能覆盖
-  if (isMove && (isAllView(src) || isAllView(destParent))) return send(res, 403, {}, '「@全部」是平铺视图，不能移动或改名里面的文件；要放进来请用复制');
+  // 「@全部」没有「来源文件夹」：从它移到文件夹 = 归入目标、保留其他归属（Eagle 在「全部」视图拖拽的行为）；
+  // Eagle 里没有「移到未分类」的手势，所以从它移到 @未分类 不支持；移进来 = 去掉原文件夹的归属
+  if (isMove && isAllView(src) && destParent.kind === 'uncat') return send(res, 403, {}, '「@全部」里的文件不能移到 @未分类；要让文件脱离文件夹，请在 Eagle 里去掉它的文件夹归属');
+  // COPY 进「@全部」= 新增一份落在未分类的新素材；目标同名且就是源条目本身时什么都不用做，撞上别的条目则不能覆盖
   const dest = await ctx.resolver.resolve(destSegs);
   if (!isMove && isAllView(destParent) && dest?.kind === 'item') {
     if (src.kind === 'item' && src.item.id === dest.item.id && pathKey(src.segs) !== pathKey(dest.segs)) return send(res, 204);
@@ -105,8 +106,7 @@ async function clearDest(
   if (sameNode(src, dest)) return { existed: false }; // 同一对象的大小写改名等，不算覆盖
   if (!overwrite) { send(res, 412, {}, '目标已存在'); return null; }
   if (dest.kind === 'item') {
-    const id = dest.item.id;
-    await ctx.mutex.run(id, () => ctx.adapter.trashItem(id));
+    await removeItemAt(ctx, dest); // 被覆盖的目标按「删除」规则处理
     ctx.index.invalidate();
     return { existed: true };
   }

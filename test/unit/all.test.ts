@@ -79,17 +79,35 @@ test('@全部 新增文件：Finder 式「0 字节占位 → 带内容」只产�
   assert.deepStrictEqual(folderOf('finder.png'), []);
 });
 
-test('@全部 不能覆盖、删除、改名、移动、改属性、新建文件夹', async () => {
-  const n = fake.items.length;
-  assert.strictEqual((await req('PUT', '/@全部/dog.png', {}, 'x')).status, 403);
-  assert.strictEqual((await req('DELETE', '/@全部/dog.png')).status, 403);
+test('@全部 里：覆盖内容、改名、改属性都可以；新建文件夹 403', async () => {
   assert.strictEqual((await req('MKCOL', '/@全部/新')).status, 403);
-  assert.strictEqual((await req('MOVE', '/@全部/dog.png', dest('/图/dog.png'))).status, 403);
-  assert.strictEqual((await req('MOVE', '/@全部/dog.png', dest('/@全部/dog2.png'))).status, 403);
-  assert.strictEqual((await req('MOVE', '/图/plain.png', dest('/@全部/plain.png'))).status, 403);
-  assert.strictEqual((await req('PROPPATCH', '/@全部/dog.png', {}, '<D:propertyupdate xmlns:D="DAV:"><D:set><D:prop><X:a xmlns:X="urn:x">1</X:a></D:prop></D:set></D:propertyupdate>')).status, 403);
-  assert.strictEqual(fake.items.length, n);
-  assert.ok(fake.items.every((i) => i.name !== 'dog2'));
+  assert.strictEqual((await req('PUT', '/@全部/dog.png', {}, 'DOG2')).status, 204);
+  assert.strictEqual((await req('GET', '/@全部/dog.png')).body, 'DOG2');
+  assert.strictEqual((await req('MOVE', '/@全部/dog.png', dest('/@全部/dog2.png'))).status, 201);
+  assert.ok(fake.items.some((i) => i.name === 'dog2'));
+  assert.strictEqual((await req('MOVE', '/@全部/dog2.png', dest('/@全部/dog.png'))).status, 201);
+  assert.strictEqual((await req('PROPPATCH', '/@全部/dog.png', {}, '<D:propertyupdate xmlns:D="DAV:" xmlns:E="urn:eagle-webdav:ns"><D:set><D:prop><E:star>4</E:star></D:prop></D:set></D:propertyupdate>')).status, 207);
+  assert.strictEqual(b.star, 4);
+});
+
+test('@全部 里删除：整个进回收站，所有文件夹里都消失（与 Eagle「全部」视图一致）', async () => {
+  const x = fake.addItem('twin', 'png', 'T', [F.id]); x.folders = [F.id, fake.addFolder('另一个2').id];
+  index.invalidate();
+  const before = fake.trashed.length;
+  assert.strictEqual((await req('DELETE', '/@全部/twin.png')).status, 204);
+  assert.strictEqual(fake.trashed.length, before + 1);
+  assert.ok(!(await names('/图')).includes('/图/twin.png'));
+});
+
+test('@全部 的移动：移出到文件夹 = 只加归属；移进来 = 去掉原文件夹；不能移到 @未分类', async () => {
+  const m = fake.addItem('mover', 'png', 'M', [F.id]);
+  const G = fake.addFolder('目标');
+  index.invalidate();
+  assert.strictEqual((await req('MOVE', '/@全部/mover.png', dest('/目标/mover.png'))).status, 201);
+  assert.deepStrictEqual([...m.folders].sort(), [F.id, G.id].sort(), '保留原来的归属');
+  assert.strictEqual((await req('MOVE', '/@全部/mover.png', dest('/@未分类/mover.png'))).status, 403);
+  assert.strictEqual((await req('MOVE', '/目标/mover.png', dest('/@全部/mover.png'))).status, 201);
+  assert.deepStrictEqual(m.folders, [F.id], '去掉了「目标」的归属');
 });
 
 test('@全部 COPY 进来：同名同一条目什么都不做；换名是落在未分类的新素材；撞上别的条目不能覆盖', async () => {
@@ -111,7 +129,8 @@ test('从 @全部 COPY 出来：同名按引用加入目标文件夹', async () 
 test('关闭视图后消失', async () => {
   allView = false;
   index.invalidate();
-  assert.deepStrictEqual(await names('/'), ['/@未分类/', '/图/', '/另一个/']);
+  const root = await names('/');
+  assert.ok(root.includes('/@未分类/') && !root.includes('/@全部/'));
   assert.strictEqual((await req('PROPFIND', '/@全部', { Depth: '0' })).status, 404);
 });
 

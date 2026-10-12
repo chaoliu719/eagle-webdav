@@ -1,17 +1,14 @@
 import assert from 'assert';
 import { EventEmitter } from 'events';
 import * as fs from 'fs';
-import * as http from 'http';
 import * as os from 'os';
 import * as path from 'path';
 import { test } from 'node:test';
 import { ConfigStore } from '../../src/config/config';
 import type { DavContext } from '../../src/dav/context';
 import { watchPending } from '../../src/dav/handlers/common';
-import { DavRouter } from '../../src/dav/router';
 import { FakeEagleAdapter } from '../../src/eagle/fakeAdapter';
 import { Authenticator } from '../../src/http/auth';
-import { DavServer } from '../../src/http/server';
 import { LibraryIndex } from '../../src/index/libraryIndex';
 import { Bonjour } from '../../src/util/bonjour';
 import { friendlyClient, summarizeClients } from '../../src/util/clients';

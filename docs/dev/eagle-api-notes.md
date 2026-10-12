@@ -9,7 +9,7 @@
 - Item 实例（属性在原型上，`Object.keys` 为空）：方法 save、replaceFile、moveToTrash、refreshThumbnail、setCustomThumbnail 等；属性 id、name、ext、size、tags、folders、filePath、fileURL、thumbnailPath、modifiedAt、importedAt、isDeleted 等；还有 `palettes`、`comments`、`metadataFilePath`、`noThumbnail`、`noPreview`
 - `eagle.folder`：create、createSubfolder(parentId,{name})、get、getAll、getById 等；Folder 的 `name`、`parent` 可写后 `save()`；`folder.getAll()` 返回的元素带 `children`；Folder 成员有 `createdAt`、`parent`、`children`、`description`、`icon`、`iconColor`。**没有删除文件夹的 API**，测试留下的 `__webdav_test_*` 文件夹要手动删
 - `eagle.library.info()` 返回 folders、modificationTime、path、name 等；没有 `library.modificationTime` / `library.name`
-- `eagle.tag.get()` 取标签名（元素为带原型 getter 的对象，取 `.name`）
+- `eagle.tag.get()` 取标签名（元素为带原型 getter 的对象，取 `.name`）。`@标签` 视图删除后插件不再用它，留作记录
 - `eagle.app.userDataPath` 存在（`~/Library/Application Support/Eagle`，配置放其下 `eagle-webdav/`）；缺失时回退到 `~/.eagle-webdav`
 - 脚本加载瞬间 `eagle.app` 的 version、build、userDataPath 读不到（曾显示 Build 0），初始化要等 `onPluginCreate`；build 读不到时不拦截启动
 - `eagle.app.locale`（官方 i18n 文档里的写法，要等 `onPluginCreate`）：**真机未实测该值的格式**

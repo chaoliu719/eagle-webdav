@@ -16,7 +16,6 @@ export class LibraryIndex {
   private itemPromises = new Map<string, Promise<ItemInfo[]>>();
   private itemCounts = new Map<string, number>();
   private cachedItems = 0;
-  private tagPromise: Promise<string[]> | null = null;
   /** 每次缓存失效都会递增，派生缓存（目录列表）据此判断是否过期。 */
   revision = 0;
   /** 本服务替换过内容的条目 → 时间戳。Eagle 的 replaceFile 不更新 modifiedAt，靠它让 ETag 随内容变化。 */
@@ -36,7 +35,6 @@ export class LibraryIndex {
   private clear(reason: string): void {
     this.logger?.log('debug', 'idx', 'invalidate', { reason, revision: this.revision + 1 });
     this.folderPromise = null;
-    this.tagPromise = null;
     this.itemPromises.clear();
     this.itemCounts.clear();
     this.cachedItems = 0;
@@ -108,23 +106,9 @@ export class LibraryIndex {
     return this.folderPromise;
   }
 
-  async tags(): Promise<string[]> {
-    await this.ensureFresh();
-    if (!this.tagPromise) {
-      const p = this.adapter.getTags();
-      p.catch(() => { if (this.tagPromise === p) this.tagPromise = null; });
-      this.tagPromise = p;
-    }
-    return this.tagPromise;
-  }
-
   /** folderId 为 null 表示未分类。 */
   items(folderId: string | null): Promise<ItemInfo[]> {
     return this.cachedItemsFor('f:' + (folderId ?? ''), () => this.adapter.getItems(folderId));
-  }
-
-  itemsByTag(tag: string): Promise<ItemInfo[]> {
-    return this.cachedItemsFor('t:' + tag, () => this.adapter.getItemsByTag(tag));
   }
 
   allItems(): Promise<ItemInfo[]> {

@@ -204,7 +204,7 @@ test('buildDiagnostics：抹掉路径，不含密码与账号', () => {
   const text = buildDiagnostics({
     pluginVersion: '1.0.0', eagleVersion: '4.0.0', build: 23, os: 'darwin 27', node: '16.17.1',
     libraryName: 'Production', folderCount: 12, listen: '0.0.0.0:41600', hasPassword: true,
-    bonjour: true, preventSleep: true, tagsView: true, allView: true, logLevel: 'info',
+    bonjour: true, preventSleep: true, allView: true, logLevel: 'info',
     perf: { windowSec: 300, req: { GET: 4, PUT: 1 }, total: 5, p50: 30, p95: 600, cacheHit: null, heapMB: 100, inflightMax: 2 },
     cache: { hit: 9, miss: 1 },
     logLines: ['{"msg":"配置目录 /Users/me/Library/Eagle/eagle-webdav"}', '{"path":"/Volumes/Lib/Production.library/images"}'],

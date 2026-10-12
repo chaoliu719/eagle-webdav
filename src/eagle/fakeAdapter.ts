@@ -102,14 +102,6 @@ export class FakeEagleAdapter implements EagleAdapter {
     return { ...it };
   }
 
-  async getTags(): Promise<string[]> {
-    return Array.from(new Set(this.items.flatMap((i) => i.tags))).sort();
-  }
-
-  async getItemsByTag(tag: string): Promise<ItemInfo[]> {
-    return this.items.filter((i) => i.tags.includes(tag)).map(({ filePath: _p, ...rest }) => ({ ...rest }));
-  }
-
   async getAllItems(): Promise<ItemInfo[]> {
     return this.items.map(({ filePath: _p, ...rest }) => ({ ...rest }));
   }

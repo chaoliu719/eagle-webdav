@@ -23,10 +23,10 @@ export function unusableItemName(name: string): boolean {
 
 export function parentSegsOf(segs: string[]): string[] { return segs.slice(0, -1); }
 
-/** 目标父目录对应的文件夹 id：真实文件夹返回 id，「@未分类」返回 null，其他不可放条目返回 undefined。 */
+/** 目标父目录对应的文件夹 id：真实文件夹返回 id，「@未分类」「@全部」（新增的文件落在未分类）返回 null，其他不可放条目返回 undefined。 */
 export function folderIdOf(parent: Resolved): string | null | undefined {
   if (parent.kind === 'folder') return parent.folder.id;
-  if (parent.kind === 'uncat') return null;
+  if (parent.kind === 'uncat' || parent.kind === 'all') return null;
   return undefined;
 }
 

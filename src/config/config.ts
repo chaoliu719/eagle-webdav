@@ -11,8 +11,6 @@ export interface Config {
   username: string;
   /** scrypt$N$salt(hex)$hash(hex)；null 表示尚未设置密码。 */
   passwordHash: string | null;
-  /** 是否暴露只读的「@标签」视图。 */
-  tagsView: boolean;
   /** 是否暴露只读的「@全部」视图（平铺列出全库条目）。只在配置文件里改，窗口里没有开关。 */
   allView: boolean;
   /** Eagle 启动后自动监听。 */
@@ -30,7 +28,6 @@ export const DEFAULT_CONFIG: Config = {
   port: 41600,
   username: 'eagle',
   passwordHash: null,
-  tagsView: true,
   allView: true,
   autoStart: true,
   bonjour: true,
@@ -69,7 +66,6 @@ function sanitize(raw: unknown): Config {
     port: Number.isInteger(port) && (port === 0 || (port >= 1024 && port < 65536)) ? port : d.port,
     username: typeof r.username === 'string' && r.username ? r.username : d.username,
     passwordHash: typeof r.passwordHash === 'string' && r.passwordHash ? r.passwordHash : null,
-    tagsView: typeof r.tagsView === 'boolean' ? r.tagsView : d.tagsView,
     allView: typeof r.allView === 'boolean' ? r.allView : d.allView,
     autoStart: typeof r.autoStart === 'boolean' ? r.autoStart : d.autoStart,
     bonjour: typeof r.bonjour === 'boolean' ? r.bonjour : d.bonjour,

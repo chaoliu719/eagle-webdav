@@ -13,7 +13,6 @@ export interface DiagInput {
   hasPassword: boolean;
   bonjour: boolean;
   preventSleep: boolean;
-  tagsView: boolean;
   allView: boolean;
   logLevel: string;
   perf: PerfSnapshot | null;
@@ -38,7 +37,7 @@ export function buildDiagnostics(i: DiagInput): string {
   lines.push(`插件 ${i.pluginVersion} · Eagle ${i.eagleVersion} Build ${i.build} · ${i.os} · Node ${i.node}`);
   lines.push(`资源库：${i.libraryName ?? '（未知）'}${i.folderCount !== null ? `（${i.folderCount} 个文件夹）` : ''}`);
   lines.push(`监听：${i.listen ?? '未运行'} · 认证：${i.hasPassword ? '已设置' : '无'} · 自动发现：${yn(i.bonjour)} · 防休眠：${yn(i.preventSleep)}`);
-  lines.push(`视图：@标签 ${yn(i.tagsView)} · @全部 ${yn(i.allView)} · 日志级别：${i.logLevel}`);
+  lines.push(`视图：@全部 ${yn(i.allView)} · 日志级别：${i.logLevel}`);
   lines.push('-- 最近 5 分钟性能 --');
   if (i.perf && i.perf.total > 0) {
     const methods = Object.entries(i.perf.req).sort((a, b) => b[1] - a[1]).map(([m, n]) => `${m} ${n}`).join(' · ');

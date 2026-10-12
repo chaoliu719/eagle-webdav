@@ -35,7 +35,7 @@ let fileLog: FileLog | null = null;
 try { fs.rmSync(path.join(os.tmpdir(), 'eagle-webdav'), { recursive: true, force: true }); } catch { /* ignore */ }
 const index = new LibraryIndex(adapter);
 index.logger = logger;
-const router = new DavRouter(adapter, index, logger, { tagsView: () => store.get().tagsView, allView: () => store.get().allView });
+const router = new DavRouter(adapter, index, logger, { allView: () => store.get().allView });
 const sleepGuard = new SleepGuard({
   enabled: () => store.get().preventSleep,
   onChange: (active, inflight) => logger.log('info', 'sys', 'sleep', { active, inflight }, active ? '防休眠：已阻止 Mac 休眠' : '防休眠：已放开')
@@ -170,7 +170,7 @@ async function copyDiagnostics(): Promise<void> {
       libraryName: lib?.name ?? null, folderCount: lib?.folderCount ?? null,
       listen: li ? `${li.host}:${li.port}${li.ipv6 ? '（含 IPv6）' : ''}` : null,
       hasPassword: !!cfg.passwordHash, bonjour: cfg.bonjour, preventSleep: cfg.preventSleep,
-      tagsView: cfg.tagsView, allView: cfg.allView, logLevel: cfg.logLevel,
+      allView: cfg.allView, logLevel: cfg.logLevel,
       perf: metrics.summary(5 * 60_000), cache: index.stats,
       logLines: (fileLog?.tail(200) ?? []).filter((l) => !/"level":"debug"/.test(l)),
       redact: [[lib?.path ?? '', '<资源库>'], [os.homedir(), '~']]

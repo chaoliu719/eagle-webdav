@@ -22,11 +22,11 @@ Eagle 后台服务插件（`serviceMode: true`），插件内用 Node `http` 手
 
 ## 虚拟路径模型
 
-- Eagle 文件夹树即目录树；根目录另有虚拟目录 `@未分类`（可写）、`@标签`（只读，配置 `tagsView` 可关）、`@全部`（只读，配置 `allView`，仅配置文件）。根目录不能放条目，PUT 返回 403
-- 只读视图共用 `isReadOnlyView`（`viaView`）：PUT / MKCOL / DELETE / MOVE / PROPPATCH 及向其中 COPY 均 403，可从中 COPY 出来
+- Eagle 文件夹树即目录树；根目录另有虚拟目录 `@未分类`（可写）、`@全部`（平铺全库，只能新增，配置 `allView`，仅配置文件）。根目录不能放条目，PUT 返回 403
+- `@全部` 的写规则集中在 `isAllView`（`src/vfs/resolver.ts`，含经它看到的条目，`viaView`）与 `folderIdOf`（`all` 和 `uncat` 一样返回 null = 新增落在未分类）：PUT 新文件放行、已有条目 403；MKCOL / DELETE / PROPPATCH / MOVE（进、出都算）403；COPY 进来：同名同一条目 204 不做事，换名走「真复制」落未分类，撞上别的条目 403；可从中 COPY 出来。LOCK 对不存在的路径照常建占位（Finder 的 0 字节 → LOCK → 内容序列在 `@全部` 里也能走通）。全部语义对照表见 `docs/user/library-behavior.md`
 - 条目 DELETE = 整个条目移入回收站；文件夹 DELETE 返回 403
 - 同名消歧：后来的加「 ~ID末6位」后缀；旧路径仍可访问（冲突键索引）
-- 目录名 `@未分类` `@标签` `@全部` 不翻译
+- 目录名 `@未分类` `@全部` 不翻译
 - PROPFIND `Depth: infinity` 返回 403 `propfind-finite-depth`
 - 路径按 NFC 匹配；精确 / 冲突键失败后用 `eagleSanitizeName` 再找一次
 

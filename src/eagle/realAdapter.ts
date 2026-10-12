@@ -171,16 +171,6 @@ export class RealEagleAdapter implements EagleAdapter {
     return lines;
   }
 
-  async getTags(): Promise<string[]> {
-    const tags: any[] = await api().tag.get();
-    const names = tags.map((t) => (typeof t === 'string' ? t : String(t?.name ?? ''))).filter(Boolean);
-    return Array.from(new Set(names));
-  }
-
-  async getItemsByTag(tag: string): Promise<ItemInfo[]> {
-    return (await api().item.get({ tags: [tag] })).map(toItem);
-  }
-
   async getAllItems(): Promise<ItemInfo[]> {
     // 实测：不带过滤条件等于全库（与 { folders: [] } 同理）
     return (await api().item.get({})).map(toItem);

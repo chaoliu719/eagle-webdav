@@ -44,7 +44,7 @@ export function idSuffix(id: string, length = 6): string {
 
 export interface Entry {
   name: string;
-  kind: 'folder' | 'item' | 'uncat' | 'all' | 'tags' | 'tag' | 'shadow';
+  kind: 'folder' | 'item' | 'uncat' | 'all' | 'shadow';
   id: string;
   shadow?: ShadowEntry;
   folder?: FolderInfo;

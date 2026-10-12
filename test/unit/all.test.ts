@@ -28,7 +28,7 @@ fake.addItem('plain', 'png', 'P', [F.id]);
 const logger = new RingLogger();
 const index = new LibraryIndex(fake);
 let allView = true;
-const router = new DavRouter(fake, index, logger, { tagsView: () => false, allView: () => allView, tmpRoot: path.join(dir, 'put') });
+const router = new DavRouter(fake, index, logger, { allView: () => allView, tmpRoot: path.join(dir, 'put') });
 const server = new DavServer({ getConfig: () => store.get(), logger, handler: (x, y) => router.handle(x, y) });
 
 const AUTH = { Authorization: 'Basic ' + Buffer.from('u:p').toString('base64') };
@@ -51,7 +51,10 @@ const names = async (p: string) =>
 
 test('启动', async () => { await server.start(); PORT = server.listenInfo!.port; });
 
-test('@全部 视图：平铺列出全库条目，可读，多文件夹条目只出现一次', async () => {
+const unfiledNames = async () => (await names('/@未分类')).map((x) => x.split('/').pop());
+const folderOf = (name: string) => fake.items.find((i) => `${i.name}.${i.ext}` === name)?.folders;
+
+test('@全部：平铺列出全库条目，可读，多文件夹条目只出现一次', async () => {
   const c = fake.addItem('multi', 'png', 'M', [F.id]); c.folders = [F.id, fake.addFolder('另一个').id];
   index.invalidate();
   assert.deepStrictEqual(await names('/'), ['/@未分类/', '/@全部/', '/图/', '/另一个/']);
@@ -59,16 +62,48 @@ test('@全部 视图：平铺列出全库条目，可读，多文件夹条目只
   assert.strictEqual((await req('GET', '/@全部/dog.png')).body, 'DOG');
 });
 
-test('@全部 视图只读：写入类方法一律 403，可 COPY 出来', async () => {
+test('@全部 新增文件：落在未分类，同时出现在 @全部 与 @未分类', async () => {
+  assert.strictEqual((await req('PUT', '/@全部/new.png', {}, 'NEW')).status, 201);
+  assert.deepStrictEqual(folderOf('new.png'), []);
+  assert.ok((await names('/@全部')).includes('/@全部/new.png'));
+  assert.ok((await unfiledNames()).includes('new.png'));
+  assert.strictEqual((await req('GET', '/@全部/new.png')).body, 'NEW');
+});
+
+test('@全部 新增文件：Finder 式「0 字节占位 → 带内容」只产生一个条目', async () => {
+  const before = fake.items.length;
+  assert.strictEqual((await req('PUT', '/@全部/finder.png', { 'Content-Length': '0' }, '')).status, 201);
+  assert.strictEqual(fake.items.length, before, '占位不入库');
+  assert.strictEqual((await req('PUT', '/@全部/finder.png', {}, 'FINDER')).status, 201);
+  assert.strictEqual(fake.items.length, before + 1);
+  assert.deepStrictEqual(folderOf('finder.png'), []);
+});
+
+test('@全部 不能覆盖、删除、改名、移动、改属性、新建文件夹', async () => {
   const n = fake.items.length;
-  assert.strictEqual((await req('PUT', '/@全部/new.png', {}, 'x')).status, 403);
   assert.strictEqual((await req('PUT', '/@全部/dog.png', {}, 'x')).status, 403);
-  assert.strictEqual((await req('MKCOL', '/@全部/新')).status, 403);
   assert.strictEqual((await req('DELETE', '/@全部/dog.png')).status, 403);
+  assert.strictEqual((await req('MKCOL', '/@全部/新')).status, 403);
   assert.strictEqual((await req('MOVE', '/@全部/dog.png', dest('/图/dog.png'))).status, 403);
-  assert.strictEqual((await req('COPY', '/图/plain.png', dest('/@全部/plain.png'))).status, 403);
+  assert.strictEqual((await req('MOVE', '/@全部/dog.png', dest('/@全部/dog2.png'))).status, 403);
+  assert.strictEqual((await req('MOVE', '/图/plain.png', dest('/@全部/plain.png'))).status, 403);
   assert.strictEqual((await req('PROPPATCH', '/@全部/dog.png', {}, '<D:propertyupdate xmlns:D="DAV:"><D:set><D:prop><X:a xmlns:X="urn:x">1</X:a></D:prop></D:set></D:propertyupdate>')).status, 403);
   assert.strictEqual(fake.items.length, n);
+  assert.ok(fake.items.every((i) => i.name !== 'dog2'));
+});
+
+test('@全部 COPY 进来：同名同一条目什么都不做；换名是落在未分类的新素材；撞上别的条目不能覆盖', async () => {
+  const n = fake.items.length;
+  assert.strictEqual((await req('COPY', '/图/plain.png', dest('/@全部/plain.png'))).status, 204);
+  assert.strictEqual(fake.items.length, n);
+  assert.strictEqual((await req('COPY', '/图/plain.png', dest('/@全部/plain-copy.png'))).status, 201);
+  assert.strictEqual(fake.items.length, n + 1);
+  assert.deepStrictEqual(folderOf('plain-copy.png'), []);
+  assert.strictEqual((await req('COPY', '/图/plain.png', dest('/@全部/dog.png'))).status, 403);
+  assert.strictEqual(fake.items.length, n + 1);
+});
+
+test('从 @全部 COPY 出来：同名按引用加入目标文件夹', async () => {
   assert.strictEqual((await req('COPY', '/@全部/dog.png', dest('/图/dog.png'))).status, 201);
   assert.deepStrictEqual(b.folders, [F.id]);
 });

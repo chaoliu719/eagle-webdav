@@ -73,10 +73,6 @@ export interface EagleAdapter {
   /** 实时读取单个条目；已进回收站或不存在返回 null。 */
   getItemFile(id: string): Promise<ItemFile | null>;
 
-  /** 全部标签名。 */
-  getTags(): Promise<string[]>;
-  /** 带某标签的条目（可属于任意文件夹）。 */
-  getItemsByTag(tag: string): Promise<ItemInfo[]>;
   /** 全库所有条目（不过滤）。 */
   getAllItems(): Promise<ItemInfo[]>;
 

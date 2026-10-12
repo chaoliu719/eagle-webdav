@@ -1,7 +1,7 @@
 import type * as http from 'http';
 import { send } from '../../http/respond';
 import { isSystemName } from '../../vfs/shadow';
-import { isCollection, isReadOnlyView, pathKey } from '../../vfs/resolver';
+import { isAllView, isCollection, pathKey } from '../../vfs/resolver';
 import type { DavContext } from '../context';
 import { parentSegsOf } from './common';
 
@@ -15,7 +15,7 @@ export async function handleMkcol(ctx: DavContext, req: http.IncomingMessage, re
   if (!parent || !isCollection(parent)) return send(res, 409, {}, '父目录不存在');
   if (await ctx.resolver.resolve(segs)) return send(res, 405, {}, '已存在');
 
-  if (isReadOnlyView(parent)) return send(res, 403, {}, '「@标签」「@全部」视图只读');
+  if (isAllView(parent)) return send(res, 403, {}, '「@全部」是平铺视图，不能新建文件夹；请到具体文件夹里新建')
   if (parent.kind === 'shadow' || isSystemName(name)) {
     ctx.shadow.putDir(pathKey([...parent.segs, name]), name);
     return send(res, 201);

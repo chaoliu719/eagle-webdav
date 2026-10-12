@@ -5,7 +5,7 @@ import type { ItemFile } from '../../eagle/adapter';
 import { send } from '../../http/respond';
 import { buildName, cleanBase } from '../../vfs/naming';
 import { isSystemName } from '../../vfs/shadow';
-import { isCollection, isReadOnlyView, pathKey, type Resolved } from '../../vfs/resolver';
+import { isAllView, isCollection, pathKey, type Resolved } from '../../vfs/resolver';
 import { writePreconditionFailed } from '../conditional';
 import type { DavContext } from '../context';
 import { etagOf } from '../props';
@@ -55,8 +55,14 @@ export async function handleTransfer(
 
   const destParent = await ctx.resolver.resolve(parentSegsOf(destSegs));
   if (!destParent || !isCollection(destParent)) return send(res, 409, {}, '目标父目录不存在');
-  if (isReadOnlyView(destParent) || (isMove && isReadOnlyView(src))) return send(res, 403, {}, '「@标签」「@全部」视图只读');
+  // 「@全部」：MOVE（含改名）进来或出去都拒绝；COPY 进来 = 新增一份落在未分类的新素材，
+  // 目标同名且就是源条目本身时什么都不用做（它本来就在这里），目标是别的条目则不能覆盖
+  if (isMove && (isAllView(src) || isAllView(destParent))) return send(res, 403, {}, '「@全部」是平铺视图，不能移动或改名里面的文件；要放进来请用复制');
   const dest = await ctx.resolver.resolve(destSegs);
+  if (!isMove && isAllView(destParent) && dest?.kind === 'item') {
+    if (src.kind === 'item' && src.item.id === dest.item.id && pathKey(src.segs) !== pathKey(dest.segs)) return send(res, 204);
+    return send(res, 403, {}, '「@全部」里已有同名文件，不能覆盖');
+  }
 
   if (dest && sameNode(src, dest) && pathKey(dest.segs) === pathKey(src.segs) && destName.normalize('NFC') === srcSegs[srcSegs.length - 1].normalize('NFC')) {
     return send(res, 403, {}, '源与目标相同');

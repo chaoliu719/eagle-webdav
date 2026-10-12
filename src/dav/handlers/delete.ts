@@ -1,6 +1,6 @@
 import type * as http from 'http';
 import { send } from '../../http/respond';
-import { isReadOnlyView, pathKey } from '../../vfs/resolver';
+import { isAllView, pathKey } from '../../vfs/resolver';
 import { writePreconditionFailed } from '../conditional';
 import type { DavContext } from '../context';
 import { etagOf } from '../props';
@@ -10,7 +10,7 @@ export async function handleDelete(ctx: DavContext, req: http.IncomingMessage, r
   const r = await ctx.resolver.resolve(segs);
   if (!r) return send(res, 404, {}, 'Not Found');
   if (r.kind === 'item' && writePreconditionFailed(req.headers, etagOf(ctx.index.normalize(r.item)))) return send(res, 412, {}, 'Precondition Failed');
-  if (isReadOnlyView(r)) return send(res, 403, {}, '「@标签」「@全部」视图只读');
+  if (isAllView(r)) return send(res, 403, {}, '「@全部」是平铺视图，只能新增文件，不能覆盖、删除、改名、移动或修改；请到文件所在的文件夹或 @未分类 里操作');
   switch (r.kind) {
     case 'shadow':
       ctx.shadow.remove(pathKey(r.segs));

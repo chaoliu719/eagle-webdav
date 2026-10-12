@@ -22,7 +22,15 @@ const stubs = `
   const crypto = { randomUUID: () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, () => ((Math.random() * 16) | 0).toString(16)), randomBytes: () => ({ toString: () => '00' }), scryptSync: () => ({ toString: () => '00' }), createHash: () => ({ update() { return this; }, digest: () => new Uint8Array(32) }), timingSafeEqual: () => true };
   window.__listens = [];
   const http = {
-    createServer: () => { const s = new Emitter(); s.listen = (...a) => { const cb = a[a.length - 1]; window.__listens.push(a[0]); if (typeof cb === 'function') setTimeout(cb, 0); }; s.close = (cb) => cb && cb(); s.address = () => ({ address: '0.0.0.0', port: 0 }); return s; }
+    createServer: (handler) => { window.__handler = handler; const s = new Emitter(); s.listen = (...a) => { const cb = a[a.length - 1]; window.__listens.push(a[0]); if (typeof cb === 'function') setTimeout(cb, 0); }; s.close = (cb) => cb && cb(); s.address = () => ({ address: '0.0.0.0', port: 0 }); return s; }
+  };
+  // 预览里模拟「某个客户端发来一个请求」：window.__fakeRequest('WebDAVFS/3.0', '127.0.0.1')
+  window.__fakeRequest = (ua, ip, method = 'OPTIONS') => {
+    const ev = {};
+    const res = { statusCode: 200, headersSent: false, writeHead(c) { this.statusCode = c; this.headersSent = true; }, write() { return true; }, end() { (ev.finish || []).forEach((f) => f()); }, on(e, f) { (ev[e] = ev[e] || []).push(f); return this; }, once() { return this; }, getHeader() { return undefined; }, setHeader() {} };
+    const req = { method, url: '/', headers: { 'user-agent': ua }, socket: { remoteAddress: ip, destroy() {} }, resume() {}, on() { return this; } };
+    res.req = req;
+    window.__handler(req, res);
   };
   const child = () => { const c = new Emitter(); c.kill = () => c.emit('exit'); return c; };
   const mods = { fs, path, os, crypto, http, events: { EventEmitter: Emitter }, stream: { Transform: class {} }, 'stream/promises': { pipeline: async () => undefined },

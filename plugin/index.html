@@ -5,74 +5,188 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Eagle WebDAV</title>
 <style>
-  :root { color-scheme: light dark; --bg:#fff; --fg:#1d1d1f; --mut:#6e6e73; --line:#d2d2d7; --card:#f5f5f7; --acc:#0a64d6; --bad:#c62828; --ok:#1b8a3a; --warnbg:#fff4d6; --warnfg:#7a5600; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#1c1c1e; --fg:#f2f2f7; --mut:#9a9aa0; --line:#3a3a3c; --card:#2c2c2e; --acc:#4da3ff; --bad:#ff6b6b; --ok:#4cd27a; --warnbg:#4a3b10; --warnfg:#ffd479; } }
-  html, body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.55 -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; }
-  body { padding:16px 18px 32px; }
-  h1 { font-size:17px; margin:0; display:flex; align-items:center; gap:10px; }
-  h2 { font-size:13px; margin:18px 0 6px; padding-top:12px; border-top:1px solid var(--line); }
-  .mut { color:var(--mut); margin:2px 0 6px; }
-  .warn { color:var(--bad); }
-  .badge { font-size:11px; font-weight:500; padding:1px 8px; border-radius:10px; background:var(--card); color:var(--mut); }
-  .badge.on { background:var(--ok); color:#fff; }
-  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:6px 0; }
-  label { display:inline-flex; gap:6px; align-items:center; }
-  input, select { background:var(--card); color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:4px 8px; font:inherit; }
-  input[type=number] { width:80px; }
-  input[type=checkbox] { padding:0; }
-  button { background:var(--acc); color:#fff; border:0; border-radius:6px; padding:5px 12px; font:inherit; cursor:pointer; }
-  button.sec { background:var(--card); color:var(--fg); border:1px solid var(--line); padding:5px 12px; }
-  button:disabled { opacity:.45; cursor:not-allowed; }
-  .notice { background:var(--warnbg); color:var(--warnfg); border-radius:8px; padding:8px 12px; margin:10px 0 0; display:flex; align-items:center; justify-content:space-between; gap:8px; }
-  table { border-collapse:collapse; width:100%; }
-  th, td { text-align:left; padding:3px 8px 3px 0; border-bottom:1px solid var(--line); }
-  th { color:var(--mut); font-weight:500; }
-  /* 表格最后一行不画下边线：下一节（details）自带上边线，否则会叠成两条 */
-  tr:last-child th, tr:last-child td { border-bottom:none; }
-  details { margin-top:14px; border-top:1px solid var(--line); padding-top:10px; }
-  summary { cursor:pointer; font-weight:600; }
-  pre { background:var(--card); border:1px solid var(--line); border-radius:6px; padding:8px; font:12px/1.5 ui-monospace, Menlo, monospace; max-height:170px; overflow:auto; white-space:pre-wrap; word-break:break-all; margin:6px 0 0; }
-  .grid { display:grid; grid-template-columns:auto 1fr; gap:6px 10px; align-items:center; }
+  :root {
+    color-scheme: light dark;
+    --bg:#F3F4F7; --card:#FFFFFF; --line:#E4E6EC; --line-soft:#ECEEF3; --field:#FFFFFF; --field-line:#DADDE5; --well:#F3F4F7; --seg:#ECEEF3; --seg-on:#FFFFFF;
+    --fg:#16181D; --mut:#6A6F7E; --faint:#8A8F9E; --acc:#2563EB; --acc-weak:#E8EFFE; --acc-off:#C6D4F7; --ok:#1F9D55; --ok-text:#167A42; --off:#C9CDD8; --dot-off:#B5B9C6;
+    --warn:#B26A00; --warn-bg:#FFF4DC; --bad:#C62828; --purple:#7C3AED; --purple-weak:#F1E9FB; --shadow:0 1px 2px rgba(20,24,40,.14);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#151619; --card:#1F2126; --line:#2C2F36; --line-soft:#2C2F36; --field:#2A2D34; --field-line:#3A3E47; --well:#2A2D34; --seg:#2A2D34; --seg-on:#43474F;
+      --fg:#F1F2F5; --mut:#9AA0AE; --faint:#7E8494; --acc:#4C80EA; --acc-weak:#22304F; --acc-off:#33466F; --ok:#2FB66B; --ok-text:#4ED58A; --off:#454952; --dot-off:#6B7080;
+      --warn:#F5B54A; --warn-bg:#3A3018; --bad:#FF7B72; --purple:#B493F5; --purple-weak:#2F2547; --shadow:0 1px 2px rgba(0,0,0,.4);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.5 -apple-system, "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif; }
+  body { padding:24px; display:flex; flex-direction:column; gap:16px; }
+  button, input { font-family:inherit; }
+  [hidden] { display:none !important; }
+
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px 22px; }
+  .card-head { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; }
+  h2 { margin:0; font-size:14px; font-weight:650; }
+  .mut { color:var(--mut); } .faint { color:var(--faint); font-size:12px; }
+
+  /* 状态卡 */
+  .hero { display:flex; flex-direction:column; gap:18px; }
+  .hero-top { display:flex; align-items:center; gap:14px; }
+  .logo { width:44px; height:44px; border-radius:11px; background:var(--acc); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .title { font-size:18px; font-weight:650; letter-spacing:-0.01em; }
+  .sub { color:var(--mut); font-size:12.5px; }
+  .grow { flex-grow:1; min-width:0; }
+  .svc { display:flex; align-items:center; gap:10px; }
+  .state { display:flex; align-items:center; gap:6px; font-weight:600; color:var(--mut); }
+  .state i { width:8px; height:8px; border-radius:50%; background:var(--dot-off); display:inline-block; }
+  .state.on { color:var(--ok-text); } .state.on i { background:var(--ok); }
+  .switch { border:0; padding:0; position:relative; cursor:pointer; flex-shrink:0; background:var(--off); transition:background .15s; }
+  .switch::after { content:""; position:absolute; background:#fff; border-radius:50%; box-shadow:0 1px 3px rgba(0,0,0,.3); transition:left .15s; }
+  .switch.lg { width:46px; height:28px; border-radius:14px; } .switch.lg::after { top:3px; left:3px; width:22px; height:22px; }
+  .switch.lg[aria-checked="true"] { background:var(--ok); } .switch.lg[aria-checked="true"]::after { left:21px; }
+  .switch.sm { width:38px; height:22px; border-radius:11px; } .switch.sm::after { top:3px; left:3px; width:16px; height:16px; }
+  .switch.sm[aria-checked="true"] { background:var(--acc); } .switch.sm[aria-checked="true"]::after { left:19px; }
+  .switch:disabled { opacity:.5; cursor:not-allowed; }
+  .addr { display:flex; align-items:center; gap:10px; background:var(--well); border-radius:10px; padding:8px 8px 8px 14px; }
+  .addr .label { color:var(--mut); font-size:12.5px; flex-shrink:0; }
+  .addr .url { flex-grow:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; user-select:all; font:500 14px ui-monospace, "SF Mono", Menlo, monospace; }
+  .addr .url.empty { color:var(--faint); font-family:inherit; font-weight:400; user-select:none; }
+  .line { font-size:12.5px; color:var(--mut); margin:-6px 0 0; }
+  .line.bad { color:var(--bad); }
+
+  /* 按钮 */
+  .btn { display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 12px; border-radius:8px; border:1px solid var(--field-line); background:var(--field); color:var(--fg); font-size:13px; font-weight:500; cursor:pointer; }
+  .btn:disabled { color:var(--faint); cursor:not-allowed; opacity:.6; }
+  .btn.lg { height:34px; padding:0 20px; font-size:13.5px; }
+  .btn.primary { border:0; background:var(--acc); color:#fff; font-weight:600; }
+  .btn.primary:disabled { background:var(--acc-off); color:#fff; opacity:1; }
+
+  /* 提示横幅 */
+  .notice { display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--warn-bg); color:var(--warn); border-radius:12px; padding:10px 14px; }
+
+  /* 设置 */
+  .form { display:flex; flex-direction:column; gap:14px; margin-top:16px; }
+  .field { display:grid; grid-template-columns:96px 1fr; align-items:center; column-gap:12px; min-height:34px; }
+  .field > .name { color:var(--mut); }
+  .ctl { display:flex; align-items:center; gap:10px; min-width:0; }
+  .chg { display:none; align-items:center; gap:6px; color:var(--warn); font-size:12.5px; }
+  .chg::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--warn); }
+  .field.changed .chg { display:inline-flex; }
+  .input { height:34px; border:1px solid var(--field-line); border-radius:8px; background:var(--field); color:var(--fg); padding:0 10px; font-size:13.5px; }
+  .input:focus { outline:none; border-color:var(--acc); box-shadow:0 0 0 3px color-mix(in srgb, var(--acc) 25%, transparent); }
+  .input.w-port { width:100px; } .input.w-text { width:100%; max-width:320px; }
+  .seg { display:inline-flex; background:var(--seg); border-radius:9px; padding:3px; }
+  .seg button { height:28px; padding:0 16px; border:0; border-radius:7px; background:transparent; color:var(--mut); font-size:13px; cursor:pointer; }
+  .seg button[aria-pressed="true"] { background:var(--seg-on); color:var(--fg); font-weight:600; box-shadow:var(--shadow); }
+  .opt { display:flex; align-items:center; gap:10px; }
+  .opts { display:flex; flex-direction:column; gap:10px; }
+  .actions { display:flex; align-items:center; gap:10px; border-top:1px solid var(--line-soft); padding-top:16px; margin-top:2px; }
+  .actions .dirty { flex-grow:1; color:var(--warn); font-size:12.5px; }
+
+  /* 设备 */
+  .dev { display:flex; align-items:center; gap:12px; padding:12px 0; border-top:1px solid var(--line-soft); }
+  .dev .ico { width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; flex-shrink:0; background:var(--acc-weak); color:var(--acc); }
+  .dev .ico.alt { background:var(--purple-weak); color:var(--purple); }
+  .dev .nm { font-size:14px; font-weight:550; } .dev .meta { color:var(--mut); font-size:12px; }
+  .dev .when { font-size:12.5px; color:var(--faint); } .dev .when.now { color:var(--ok-text); font-weight:550; }
+  .empty-box { border:1px dashed var(--field-line); border-radius:10px; height:96px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:var(--faint); margin-top:4px; }
+  .card.devs { padding-bottom:8px; } .card.devs.is-empty { padding-bottom:20px; }
+
+  /* 排错信息 */
+  .more { padding:0; }
+  .more details + details { border-top:1px solid var(--line-soft); }
+  .more summary { display:flex; align-items:center; justify-content:space-between; height:46px; padding:0 22px; cursor:pointer; list-style:none; font-size:13.5px; font-weight:550; }
+  .more summary::-webkit-details-marker { display:none; }
+  .more summary svg { color:var(--faint); transition:transform .15s; }
+  .more details[open] summary svg { transform:rotate(90deg); }
+  .more pre { margin:0 22px 18px; background:var(--well); border-radius:8px; padding:10px 12px; font:12px/1.5 ui-monospace, "SF Mono", Menlo, monospace; max-height:200px; overflow:auto; white-space:pre-wrap; word-break:break-all; }
 </style>
 </head>
 <body>
-<h1>Eagle WebDAV <span class="badge" id="state">未启动</span></h1>
-<p class="mut" id="status">加载中…</p>
-<div class="row"><button id="btnStart">启动</button><button id="btnStop" class="sec" disabled>停止</button></div>
-<p class="mut" id="sleep"></p>
-<div id="notices"></div>
 
-<h2>设置</h2>
-<div id="settings">
-  <div class="grid">
-    <span>监听地址</span><div><select id="host"></select></div>
-    <span>端口</span><div><input type="number" id="port" min="1" max="65535"></div>
-    <span>账号</span><div><input type="text" id="user" size="32"></div>
-    <span>密码</span><div><input type="password" id="pass" size="32"></div>
-    <span>选项</span><div class="row" style="margin:0">
-      <label><input type="checkbox" id="bonjour"> 自动发现（Bonjour）</label>
-      <label><input type="checkbox" id="nosleep"> 有连接时阻止休眠</label>
+<section class="card hero">
+  <div class="hero-top">
+    <div class="logo">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><path d="M12 11v4M10 13h4"/></svg>
+    </div>
+    <div class="grow">
+      <div class="title">Eagle WebDAV</div>
+      <div class="sub" id="library">资源库：—</div>
+    </div>
+    <div class="svc">
+      <span class="state" id="state"><i></i><span id="stateText">未启动</span></span>
+      <button type="button" class="switch lg" id="svc" role="switch" aria-checked="false" aria-label="服务开关"></button>
     </div>
   </div>
-  <div class="row">
-    <button id="btnSave" disabled>保存</button>
-    <button id="btnDiscard" class="sec" disabled>放弃</button>
-    <span class="mut" id="dirty"></span>
+
+  <div class="addr">
+    <span class="label">连接地址</span>
+    <span class="url empty" id="address">启动后显示</span>
+    <button type="button" class="btn" id="btnCopy" disabled>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg><span id="copyText">复制</span>
+    </button>
   </div>
-</div>
+  <p class="line" id="status" hidden></p>
+  <p class="line" id="sleep" hidden></p>
+</section>
 
-<h2>最近连接的客户端</h2>
-<table id="clients"><tbody><tr><td class="mut">（尚无连接）</td></tr></tbody></table>
+<div id="notices" style="display:contents"></div>
 
+<section class="card">
+  <h2>设置</h2>
+  <div class="form">
+    <div class="field" data-key="mode">
+      <span class="name">谁能访问</span>
+      <div class="ctl">
+        <div class="seg">
+          <button type="button" id="modeLocal" aria-pressed="false">仅这台 Mac</button>
+          <button type="button" id="modeLan" aria-pressed="true">局域网内的设备</button>
+        </div>
+        <span class="chg">已修改</span>
+      </div>
+    </div>
+    <div class="field" data-key="port">
+      <label class="name" for="port">端口</label>
+      <div class="ctl"><input class="input w-port" id="port" type="number" min="1" max="65535"><span class="chg">已修改</span></div>
+    </div>
+    <div class="field" data-key="user">
+      <label class="name" for="user">账号</label>
+      <div class="ctl"><input class="input w-text" id="user" type="text" autocomplete="off"><span class="chg">已修改</span></div>
+    </div>
+    <div class="field" data-key="pass">
+      <label class="name" for="pass">密码</label>
+      <div class="ctl"><input class="input w-text" id="pass" type="password" autocomplete="new-password"><span class="chg">已修改</span></div>
+    </div>
+    <div class="field">
+      <span class="name">选项</span>
+      <div class="opts">
+        <div class="opt"><button type="button" class="switch sm" id="bonjour" role="switch" aria-checked="true" aria-label="自动发现（Bonjour）"></button><span>自动发现（Bonjour）</span></div>
+        <div class="opt"><button type="button" class="switch sm" id="nosleep" role="switch" aria-checked="true" aria-label="有连接时阻止休眠"></button><span>有连接时阻止休眠</span></div>
+      </div>
+    </div>
+    <div class="actions">
+      <span class="dirty" id="dirty"></span>
+      <button type="button" class="btn lg" id="btnDiscard" disabled>放弃</button>
+      <button type="button" class="btn lg primary" id="btnSave" disabled>保存</button>
+    </div>
+  </div>
+</section>
 
-<details>
-  <summary>最近请求</summary>
-  <pre id="reqlog">（尚无请求）</pre>
-</details>
-<details>
-  <summary>日志</summary>
-  <pre id="msglog"></pre>
-</details>
+<section class="card devs is-empty" id="devsCard">
+  <div class="card-head"><h2>最近连接的设备</h2><span class="faint" id="devCount"></span></div>
+  <div id="devices"></div>
+</section>
+
+<section class="card more">
+  <details>
+    <summary>最近请求<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>
+    <pre id="reqlog">（尚无请求）</pre>
+  </details>
+  <details>
+    <summary>日志<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>
+    <pre id="msglog"></pre>
+  </details>
+</section>
 
 <script src="js/plugin.js"></script>
 </body>

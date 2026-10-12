@@ -18,6 +18,12 @@ export function lanAddresses(): LanAddress[] {
   return out;
 }
 
+/** 其他设备该填的地址：监听所有网卡时取第一块局域网网卡，否则就是监听地址本身。 */
+export function connectUrl(host: string, port: number): string {
+  const ip = host === '0.0.0.0' ? lanAddresses()[0]?.address ?? '127.0.0.1' : host;
+  return `http://${ip}:${port}/`;
+}
+
 export interface SettingsForm {
   host: string;
   port: number;
@@ -53,95 +59,153 @@ export interface InitialSettings {
  */
 const MASK = '•'.repeat(10);
 
-function ago(ms: number): string {
+type Mode = 'local' | 'lan';
+const LOCAL_HOSTS = ['127.0.0.1', '::1', 'localhost'];
+const modeOf = (host: string): Mode => (LOCAL_HOSTS.includes(host) ? 'local' : 'lan');
+
+function ago(ms: number): { text: string; now: boolean } {
   const s = Math.max(0, Math.round(ms / 1000));
-  if (s < 5) return '刚刚';
-  if (s < 60) return `${s} 秒前`;
-  return `${Math.round(s / 60)} 分钟前`;
+  if (s < 10) return { text: '刚刚', now: true };
+  if (s < 60) return { text: `${s} 秒前`, now: false };
+  return { text: `${Math.round(s / 60)} 分钟前`, now: false };
+}
+
+const ICON_MONITOR = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>';
+const ICON_TV = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M9 21h6M12 17v4"/><path d="M10 9.5v4l3.5-2z"/></svg>';
+const ICON_TERMINAL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M12 15h5"/></svg>';
+
+function iconFor(client: string): { svg: string; alt: boolean } {
+  if (client === 'Infuse') return { svg: ICON_TV, alt: true };
+  if (['rclone', 'curl', 'ffmpeg'].includes(client)) return { svg: ICON_TERMINAL, alt: false };
+  return { svg: ICON_MONITOR, alt: false };
+}
+
+function copyText(text: string): void {
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch { /* ignore */ }
+    ta.remove();
+  };
+  try {
+    void navigator.clipboard.writeText(text).catch(fallback);
+  } catch {
+    fallback();
+  }
 }
 
 export class StatusView {
   private lastRender = 0;
   private timer: ReturnType<typeof setInterval> | null = null;
+  private baseline = '';
+  private baseForm!: SettingsForm;
+  private baseMode: Mode = 'lan';
+  private mode: Mode = 'lan';
+  private address: string | null = null;
 
   constructor(private logger: RingLogger) {
     logger.onChange(() => this.renderLog(false));
     this.timer = setInterval(() => this.renderLog(true), 2000);
   }
 
-  private baseline = '';
-
   bind(handlers: StatusHandlers): void {
-    const initial = handlers.getSettings();
-    const sel = $<HTMLSelectElement>('host');
-    const options: Array<[string, string]> = [['仅本机（127.0.0.1）', '127.0.0.1']];
-    for (const a of lanAddresses()) options.push([`${a.address}（${a.name}）`, a.address]);
-    options.push(['所有网卡（0.0.0.0）', '0.0.0.0']);
-    if (!options.some((o) => o[1] === initial.host)) options.push([initial.host, initial.host]);
-    for (const [label, value] of options) sel.add(new Option(label, value));
+    this.applySettings(handlers.getSettings());
 
-    this.applySettings(initial);
-    for (const id of ['host', 'port', 'user', 'pass', 'bonjour', 'nosleep']) {
-      const el = $(id);
-      el.addEventListener('input', () => this.updateDirty());
-      el.addEventListener('change', () => this.updateDirty());
+    for (const id of ['port', 'user', 'pass']) {
+      $(id).addEventListener('input', () => this.updateDirty());
     }
+    $('modeLocal').addEventListener('click', () => this.setMode('local'));
+    $('modeLan').addEventListener('click', () => this.setMode('lan'));
+    for (const id of ['bonjour', 'nosleep']) {
+      $(id).addEventListener('click', () => { this.setSwitch(id, !this.getSwitch(id)); this.updateDirty(); });
+    }
+    // 点进去全选黑点，直接输入就是替换；清空则表示清除密码（点「放弃」可恢复）
+    const pass = $<HTMLInputElement>('pass');
+    pass.addEventListener('focus', () => { if (pass.value === MASK) pass.select(); });
 
-    for (const id of ['pass']) {
-      const el = $<HTMLInputElement>(id);
-      // 点进去全选黑点，直接输入就是替换；清空则表示清除密码（点「放弃」可恢复）
-      el.addEventListener('focus', () => { if (el.value === MASK) el.select(); });
-    }
-    $('btnStart').addEventListener('click', () => handlers.onStart());
-    $('btnStop').addEventListener('click', () => handlers.onStop());
+    $('svc').addEventListener('click', () => (this.getSwitch('svc') ? handlers.onStop() : handlers.onStart()));
     $('btnSave').addEventListener('click', () => handlers.onSave(this.readForm()));
     $('btnDiscard').addEventListener('click', () => this.applySettings(handlers.getSettings()));
+    $('btnCopy').addEventListener('click', () => {
+      if (!this.address) return;
+      copyText(this.address);
+      $('copyText').textContent = '已复制';
+      setTimeout(() => { $('copyText').textContent = '复制'; }, 1200);
+    });
+  }
+
+  private getSwitch(id: string): boolean { return $(id).getAttribute('aria-checked') === 'true'; }
+  private setSwitch(id: string, on: boolean): void { $(id).setAttribute('aria-checked', on ? 'true' : 'false'); }
+
+  private setMode(m: Mode): void {
+    this.mode = m;
+    $('modeLocal').setAttribute('aria-pressed', String(m === 'local'));
+    $('modeLan').setAttribute('aria-pressed', String(m === 'lan'));
+    if (this.baseForm) this.updateDirty();
   }
 
   /** 用已保存的配置填充表单（保存成功后、或点「放弃」时），并清空密码框。 */
   applySettings(s: InitialSettings): void {
-    $<HTMLSelectElement>('host').value = s.host;
+    this.baseMode = modeOf(s.host);
+    this.mode = this.baseMode;
+    $('modeLocal').setAttribute('aria-pressed', String(this.mode === 'local'));
+    $('modeLan').setAttribute('aria-pressed', String(this.mode === 'lan'));
     $<HTMLInputElement>('port').value = String(s.port);
     $<HTMLInputElement>('user').value = s.username;
-    this.setPassword('pass', s.hasPassword, '未设置');
-    $<HTMLInputElement>('bonjour').checked = s.bonjour;
-    $<HTMLInputElement>('nosleep').checked = s.preventSleep;
-    this.baseline = JSON.stringify(this.readForm());
+    this.setPassword(s.hasPassword);
+    this.setSwitch('bonjour', s.bonjour);
+    this.setSwitch('nosleep', s.preventSleep);
+    // 「谁能访问」没动时保留原来的监听地址（可能是某个具体 IP）
+    this.baseForm = { ...this.readForm(), host: s.host };
+    this.baseline = JSON.stringify(this.baseForm);
     this.updateDirty();
   }
 
-  private setPassword(id: string, isSet: boolean, emptyHint: string): void {
-    const el = $<HTMLInputElement>(id);
+  private setPassword(isSet: boolean): void {
+    const el = $<HTMLInputElement>('pass');
     el.value = isSet ? MASK : '';
-    el.placeholder = isSet ? '' : emptyHint;
+    el.placeholder = isSet ? '' : '未设置';
     el.dataset.isSet = isSet ? '1' : '';
   }
 
   /** 密码框的意图：null = 不修改（黑点，或本来就没设置且仍为空）；'' = 清除；其他 = 新密码。 */
-  private passwordValue(id: string): string | null {
-    const el = $<HTMLInputElement>(id);
+  private passwordValue(): string | null {
+    const el = $<HTMLInputElement>('pass');
     if (el.value === MASK) return null;
     if (el.value === '' && !el.dataset.isSet) return null;
     return el.value;
   }
 
   private readForm(): SettingsForm {
+    const host = this.baseForm && this.mode === this.baseMode ? this.baseForm.host : this.mode === 'local' ? '127.0.0.1' : '0.0.0.0';
     return {
-      host: $<HTMLSelectElement>('host').value,
+      host,
       port: parseInt($<HTMLInputElement>('port').value, 10) || 0,
       username: $<HTMLInputElement>('user').value.trim(),
-      password: this.passwordValue('pass'),
-      bonjour: $<HTMLInputElement>('bonjour').checked,
-      preventSleep: $<HTMLInputElement>('nosleep').checked
+      password: this.passwordValue(),
+      bonjour: this.getSwitch('bonjour'),
+      preventSleep: this.getSwitch('nosleep')
     };
   }
 
-  /** 有未保存的修改时才启用「保存」「放弃」。 */
+  /** 有未保存的修改时才启用「保存」「放弃」，并在改动的字段旁标「已修改」。 */
   private updateDirty(): void {
-    const dirty = JSON.stringify(this.readForm()) !== this.baseline;
+    const cur = this.readForm();
+    const dirty = JSON.stringify(cur) !== this.baseline;
     $<HTMLButtonElement>('btnSave').disabled = !dirty;
     $<HTMLButtonElement>('btnDiscard').disabled = !dirty;
     $('dirty').textContent = dirty ? '有未保存的修改' : '';
+    const changed: Record<string, boolean> = {
+      mode: this.mode !== this.baseMode,
+      port: cur.port !== this.baseForm.port,
+      user: cur.username !== this.baseForm.username,
+      pass: cur.password !== null
+    };
+    document.querySelectorAll<HTMLElement>('.field[data-key]').forEach((el) => {
+      el.classList.toggle('changed', !!changed[el.dataset.key as string]);
+    });
   }
 
   setSaving(saving: boolean): void {
@@ -153,21 +217,38 @@ export class StatusView {
     }
   }
 
+  /** 服务状态之外的提示：出错（红）或正在做的事（灰）；空串表示隐藏。 */
   setStatus(text: string, bad = false): void {
     const el = $('status');
     el.textContent = text;
-    el.classList.toggle('warn', bad);
+    el.hidden = !text;
+    el.classList.toggle('bad', bad);
+  }
+
+  setLibrary(name: string): void {
+    $('library').textContent = name ? `资源库：${name}` : '资源库：—';
   }
 
   setRunning(running: boolean): void {
-    $<HTMLButtonElement>('btnStart').disabled = running;
-    $<HTMLButtonElement>('btnStop').disabled = !running;
-    $('state').textContent = running ? '运行中' : '未启动';
+    this.setSwitch('svc', running);
     $('state').classList.toggle('on', running);
+    $('stateText').textContent = running ? '运行中' : '未启动';
+    if (!running) this.setAddress(null);
+  }
+
+  /** 其他设备要填的地址；null 表示服务没在运行。 */
+  setAddress(url: string | null): void {
+    this.address = url;
+    const el = $('address');
+    el.textContent = url ?? '启动后显示';
+    el.classList.toggle('empty', !url);
+    $<HTMLButtonElement>('btnCopy').disabled = !url;
   }
 
   setSleepState(active: boolean, enabled: boolean): void {
-    $('sleep').textContent = enabled && active ? '正在阻止 Mac 休眠（有文件传输）。' : '';
+    const el = $('sleep');
+    el.textContent = enabled && active ? '正在阻止 Mac 休眠（有文件传输）。' : '';
+    el.hidden = !el.textContent;
   }
 
   renderLog(force: boolean): void {
@@ -183,30 +264,50 @@ export class StatusView {
       const msg = document.createElement('span');
       msg.textContent = n.message;
       const btn = document.createElement('button');
-      btn.className = 'sec';
+      btn.type = 'button';
+      btn.className = 'btn';
       btn.textContent = '忽略';
-      btn.style.marginLeft = '10px';
       btn.addEventListener('click', () => { this.logger.clearNotice(n.key); this.renderLog(true); });
       d.append(msg, btn);
       notices.append(d);
     }
 
-    const body = $('clients').querySelector('tbody') as HTMLElement;
-    body.textContent = '';
-    const list = summarizeClients(this.logger.recent(), now);
+    const list = summarizeClients(this.logger.recent(), now).slice(0, 8);
+    const box = $('devices');
+    box.textContent = '';
+    $('devCount').textContent = list.length ? `${list.length} 台` : '';
+    $('devsCard').classList.toggle('is-empty', !list.length);
     if (!list.length) {
-      body.innerHTML = '<tr><td class="mut">（尚无连接）</td></tr>';
-    } else {
-      body.innerHTML = '<tr><th>客户端</th><th>地址</th><th>请求数</th><th>最近</th></tr>';
-      for (const c of list.slice(0, 8)) {
-        const tr = document.createElement('tr');
-        for (const t of [c.client, c.ip, String(c.requests), ago(now - c.lastSeen)]) {
-          const td = document.createElement('td');
-          td.textContent = t;
-          tr.append(td);
-        }
-        body.append(tr);
-      }
+      const empty = document.createElement('div');
+      empty.className = 'empty-box';
+      empty.innerHTML = ICON_MONITOR.replace('width="18" height="18"', 'width="22" height="22"');
+      const t = document.createElement('span');
+      t.textContent = '还没有设备连接';
+      empty.append(t);
+      box.append(empty);
+    }
+    for (const c of list) {
+      const icon = iconFor(c.client);
+      const when = ago(now - c.lastSeen);
+      const row = document.createElement('div');
+      row.className = 'dev';
+      const ico = document.createElement('div');
+      ico.className = 'ico' + (icon.alt ? ' alt' : '');
+      ico.innerHTML = icon.svg;
+      const info = document.createElement('div');
+      info.className = 'grow';
+      const nm = document.createElement('div');
+      nm.className = 'nm';
+      nm.textContent = c.client;
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.textContent = `${c.ip} · ${c.requests} 次请求`;
+      info.append(nm, meta);
+      const w = document.createElement('div');
+      w.className = 'when' + (when.now ? ' now' : '');
+      w.textContent = when.text;
+      row.append(ico, info, w);
+      box.append(row);
     }
 
     const lines = this.logger.recent(60).map((e) =>

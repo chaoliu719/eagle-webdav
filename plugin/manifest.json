@@ -16,7 +16,7 @@
     "serviceMode": true,
     "url": "index.html",
     "width": 680,
-    "height": 820,
+    "height": 900,
     "minWidth": 480,
     "minHeight": 420,
     "resizable": true,

@@ -7,7 +7,7 @@ import { RealEagleAdapter, userDataDir } from './eagle/realAdapter';
 import { DavRouter } from './dav/router';
 import { DavServer } from './http/server';
 import { LibraryIndex } from './index/libraryIndex';
-import { StatusView, type InitialSettings, type SettingsForm } from './ui/status';
+import { StatusView, connectUrl, type InitialSettings, type SettingsForm } from './ui/status';
 import { Bonjour } from './util/bonjour';
 import { RingLogger } from './util/log';
 import { SleepGuard } from './util/sleepGuard';
@@ -47,6 +47,9 @@ async function start(): Promise<void> {
     const info = await server.start();
     const lib = await adapter.libraryInfo().catch(() => null);
     view.setRunning(true);
+    view.setAddress(connectUrl(info.host, info.port));
+    view.setLibrary(lib ? lib.name : '');
+    view.setStatus('');
     // 只在对局域网开放时才广播；仅本机监听没有意义
     const cfg = store.get();
     const discoverable = cfg.bonjour && info.host !== '127.0.0.1' && info.host !== '::1';
@@ -54,7 +57,6 @@ async function start(): Promise<void> {
     if (adapter instanceof RealEagleAdapter) {
       adapter.diagnose().then((ls) => ls.forEach((l) => logger.info(l)), (e: Error) => logger.warn('形态自检失败：' + e.message));
     }
-    view.setStatus(`运行中 · ${lib ? '资源库：' + lib.name : ''}`);
   } catch (e) {
     const err = e as NodeJS.ErrnoException;
     const msg = err.code === 'EADDRINUSE' ? `端口 ${store.get().port} 已被占用` : err.message;
@@ -69,7 +71,7 @@ async function stop(): Promise<void> {
   sleepGuard.release();
   await server.stop();
   view.setRunning(false);
-  view.setStatus('已停止');
+  view.setStatus('');
 }
 
 function currentSettings(): InitialSettings {
@@ -130,7 +132,7 @@ function init(): void {
     getSettings: currentSettings
   });
   setInterval(() => view.setSleepState(sleepGuard.active, store.get().preventSleep), 2000);
-  view.setStatus('已停止');
+  view.setStatus('');
   view.renderLog(true);
 
   if (cfg.autoStart) void start();
@@ -146,7 +148,8 @@ function registerLifecycle(): void {
       // 清空索引缓存；后续里程碑在此一并清理锁与影子条目
       router.reset();
       const lib = await adapter.libraryInfo();
-      view.setStatus(`运行中 · 资源库：${lib.name}`);
+      view.setLibrary(lib.name);
+      view.setStatus('');
     } catch (e) {
       logger.error('资源库重载失败：' + (e as Error).message);
     } finally {

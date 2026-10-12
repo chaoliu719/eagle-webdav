@@ -81,7 +81,7 @@ Infuse 与 iPad 实机、Finder 图形界面的拖拽、几十万条的真实大
 - 补齐项（已真机验证）：写入类方法支持 `If-Match` / `If-None-Match`（412）；LOCK 永不拒绝并对不存在的 URL 建占位（Finder 崩溃留下的旧锁不会把自己锁死）；`E:width` / `E:height`；上传 120s 空闲中止；启动时清理上次遗留的临时目录、退出时 `dispose()`
 - 未做：litmus 协议合规测试（homebrew 里没有，需手动编译）；dead 属性不落盘；真实锁语义（有意不做）；目录 `getlastmodified` 取目录创建时间而非内部最新修改
 - M0 探针已停用（用户不再使用）；本插件监听 0.0.0.0:41600
-- 窗口界面（`plugin/index.html` + `src/ui/status.ts`）可不装进 Eagle 直接预览与点测：`node test/dev/ui-preview.mjs`，再用浏览器打开 `http://127.0.0.1:41777/`（`?pw=1` 模拟已设置密码）。已设置的密码在输入框里显示为 10 个黑点占位：黑点 = 不修改；清空 = 清除密码（保存后哈希置 null，即不再认证）；输入新内容 = 设置新密码；点进去自动全选，点「放弃」恢复；设置区有「保存」「放弃」，保存会校验后写配置并自动启动/重启，改动前两个按钮是灰的
+- 窗口界面按设计稿（Claude Design 画布「Eagle WebDAV 管理窗口重设计」）实现：状态卡（图标、资源库名、运行中开关、连接地址 + 复制）→ 设置（谁能访问：仅这台 Mac / 局域网内的设备，对应 host 127.0.0.1 / 0.0.0.0，没改动时保留原监听地址；端口；账号；密码；两个开关选项；改动的字段旁标「已修改」；保存 / 放弃）→ 最近连接的设备（图标、请求数、刚刚/N 分钟前、空状态）→ 最近请求与日志（`<details>` 默认收起）；浅色 / 深色跟随系统。用户明确删掉的说明文字（自动发现说明、阻止休眠常驻提示、「所有网卡」警告、「密码留空…」、只读账号、来源网段）没有加回。窗口可不装进 Eagle 直接预览与点测：`node test/dev/ui-preview.mjs`，再用浏览器打开 `http://127.0.0.1:41777/`（`?pw=1` 模拟已设置密码；页面里 `window.__fakeRequest(ua, ip, method)` 可模拟客户端请求，用来看设备列表）。已设置的密码在输入框里显示为 10 个黑点占位：黑点 = 不修改；清空 = 清除密码（保存后哈希置 null，即不再认证）；输入新内容 = 设置新密码；点进去自动全选，点「放弃」恢复；设置区有「保存」「放弃」，保存会校验后写配置并自动启动/重启，改动前两个按钮是灰的
 - 联调：不依赖 Eagle 用 `npx tsx test/dev/fake-server.ts` 起假数据服务；命令行 `mount_webdav` 带 URL 凭据会返回 22，改用 `osascript -e 'mount volume "http://127.0.0.1:41600/" as user name "eagle" with password "..."'`（走 NetFS，与 Finder 一致）；重载插件页面可在其 DevTools 控制台执行 `location.reload()`（屏幕锁定时 GUI 操作不可用）
 - 源码：`src/{config,http,eagle,util,ui}`；只有 `src/eagle/realAdapter.ts` 可直接碰全局 `eagle`；`eagle.app.userDataPath` 未实测，缺失时回退到 `~/.eagle-webdav`
 - 与 rclone 对照：`npx tsx test/dev/fake-server.ts` 起假数据服务后用 rclone 联调

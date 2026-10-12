@@ -31,7 +31,7 @@ function inAny(ip: number, list: Cidr[]): boolean {
   return list.some((c) => ((ip & c.mask) >>> 0) === c.base);
 }
 
-export function isAllowedAddress(remote: string | undefined, extra: string[] = []): boolean {
+export function isAllowedAddress(remote: string | undefined): boolean {
   if (!remote) return false;
   let addr = remote.toLowerCase();
   const zone = addr.indexOf('%');
@@ -41,9 +41,7 @@ export function isAllowedAddress(remote: string | undefined, extra: string[] = [
 
   const v4 = parseIPv4(addr);
   if (v4 !== null) {
-    if (inAny(v4, DEFAULT_V4)) return true;
-    const extras = extra.map(parseCidr).filter((c): c is Cidr => c !== null);
-    return inAny(v4, extras);
+    return inAny(v4, DEFAULT_V4);
   }
   // IPv6：回环、链路本地 fe80::/10、唯一本地 fc00::/7
   if (addr === '::1') return true;

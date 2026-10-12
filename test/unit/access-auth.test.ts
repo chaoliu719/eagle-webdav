@@ -9,7 +9,6 @@ test('源地址过滤', () => {
     assert.ok(isAllowedAddress(ok), ok);
   for (const bad of ['8.8.8.8', '172.32.0.1', '100.64.0.1', '2001:db8::1', '', undefined])
     assert.ok(!isAllowedAddress(bad as string | undefined), String(bad));
-  assert.ok(isAllowedAddress('100.64.1.1', ['100.64.0.0/10']));
 });
 
 test('密码哈希', () => {

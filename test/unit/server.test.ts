@@ -43,7 +43,7 @@ test('配置文件权限为 0600', () => {
 test('没设管理密码：不要求认证，任何访问都是管理账号，也可以监听非本机地址', async () => {
   const s = new DavServer({
     getConfig: () => ({ ...store.get(), host: '127.0.0.1', port: 41693, passwordHash: null }), logger,
-    handler: (a, b, role) => { assert.strictEqual(role, 'admin'); return router.handle(a, b, role); }
+    handler: (a, b) => router.handle(a, b)
   });
   await s.start();
   try {
@@ -58,6 +58,28 @@ test('没设管理密码：不要求认证，任何访问都是管理账号，�
   const wide = new DavServer({ getConfig: () => ({ ...store.get(), host: '0.0.0.0', port: 41692, passwordHash: null }), logger, handler });
   await wide.start();
   await wide.stop();
+});
+
+test('只有传输类请求才计入防休眠活动，浏览与心跳不计', async () => {
+  const events: string[] = [];
+  const s = new DavServer({
+    getConfig: () => ({ ...store.get(), port: 41691, passwordHash: null }), logger, handler,
+    activity: { begin: () => events.push('begin'), end: () => events.push('end') }
+  });
+  await s.start();
+  const call = (method: string, p = '/') => new Promise<void>((resolve, reject) => {
+    http.request({ host: '127.0.0.1', port: 41691, method, path: p }, (res) => { res.resume(); res.on('end', () => resolve()); }).on('error', reject).end();
+  });
+  try {
+    await call('OPTIONS'); await call('PROPFIND'); await call('LOCK'); await call('HEAD');
+    await new Promise((r) => setTimeout(r, 50));
+    assert.deepStrictEqual(events, [], 'OPTIONS / PROPFIND / LOCK / HEAD 不计入');
+    await call('GET', '/nope.txt'); await call('PUT', '/nope.txt');
+    await new Promise((r) => setTimeout(r, 50));
+    assert.deepStrictEqual(events, ['begin', 'end', 'begin', 'end'], 'GET / PUT 计入，且成对');
+  } finally {
+    await s.stop();
+  }
 });
 
 test('认证、OPTIONS、501、503', async () => {

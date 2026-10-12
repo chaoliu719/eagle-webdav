@@ -47,9 +47,8 @@
   <div class="grid">
     <span>监听地址</span><div><select id="host"></select></div>
     <span>端口</span><div><input type="number" id="port" min="1" max="65535"></div>
-    <span>管理账号</span><div class="row" style="margin:0"><input type="text" id="user" size="10"> <input type="password" id="pass" size="32"></div>
-    <span>只读账号</span><div class="row" style="margin:0"><input type="text" id="rouser" size="10"> <input type="password" id="ropass" size="32"></div>
-    <span>额外允许的来源网段</span><div><input type="text" id="cidrs" size="34" placeholder="如 100.64.0.0/10，多个用逗号分隔"></div>
+    <span>账号</span><div><input type="text" id="user" size="32"></div>
+    <span>密码</span><div><input type="password" id="pass" size="32"></div>
     <span>选项</span><div class="row" style="margin:0">
       <label><input type="checkbox" id="bonjour"> 自动发现（Bonjour）</label>
       <label><input type="checkbox" id="nosleep"> 有连接时阻止休眠</label>

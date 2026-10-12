@@ -20,80 +20,18 @@ import { SleepGuard } from '../../src/util/sleepGuard';
 
 const basic = (s: string) => 'Basic ' + Buffer.from(s).toString('base64');
 
-test('没设管理密码时不要求认证', () => {
+test('没设管理密码时不要求认证；设了则校验账号密码', () => {
   const a = new Authenticator();
-  const cfg = { username: 'eagle', passwordHash: null, readonlyUsername: 'viewer', readonlyPasswordHash: null };
-  assert.deepStrictEqual(a.login(undefined, '1.1.1.1', cfg), { result: 'ok', role: 'admin' });
-  assert.deepStrictEqual(a.login(basic('x:y'), '1.1.1.1', cfg), { result: 'ok', role: 'admin' });
-});
-
-test('认证区分管理账号与只读账号', () => {
+  const none = { username: 'eagle', passwordHash: null };
+  assert.strictEqual(a.check(undefined, '1.1.1.1', none), 'ok');
+  assert.strictEqual(a.check(basic('x:y'), '1.1.1.1', none), 'ok');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ewdav-x-'));
   const store = new ConfigStore(dir);
   store.load();
   store.setPassword('adminpw');
-  store.setReadonlyPassword('viewpw');
-  const cfg = store.get();
-  const a = new Authenticator();
-  assert.deepStrictEqual(a.login(basic('eagle:adminpw'), '1.1.1.1', cfg), { result: 'ok', role: 'admin' });
-  assert.deepStrictEqual(a.login(basic('viewer:viewpw'), '1.1.1.1', cfg), { result: 'ok', role: 'readonly' });
-  assert.strictEqual(a.login(basic('viewer:adminpw'), '1.1.1.1', cfg).result, 'denied');
-  assert.strictEqual(a.login(basic('eagle:viewpw'), '1.1.1.1', cfg).result, 'denied');
-  // 未设置只读密码时，只读账号不可用
-  store.update({ readonlyPasswordHash: null });
-  assert.strictEqual(a.login(basic('viewer:viewpw'), '2.2.2.2', store.get()).result, 'denied');
-  // 与管理账号同名的只读账号配置无效
-  store.setReadonlyPassword('same');
-  store.update({ readonlyUsername: 'eagle' });
-  assert.strictEqual(a.login(basic('eagle:same'), '3.3.3.3', store.get()).result, 'denied');
-});
-
-test('只读账号：写入类方法 403，读取正常，以 DAV: 1 通告', async () => {
-  const PORT = 41694;
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ewdav-ro-'));
-  const store = new ConfigStore(dir);
-  store.load();
-  store.update({ host: '127.0.0.1', port: PORT, username: 'u' });
-  store.setPassword('p');
-  store.setReadonlyPassword('ro');
-  const fake = new FakeEagleAdapter();
-  const F = fake.addFolder('A');
-  fake.addItem('x', 'txt', 'hello', [F.id]);
-  const logger = new RingLogger();
-  const router = new DavRouter(fake, new LibraryIndex(fake), logger, { tmpRoot: path.join(dir, 'put') });
-  const server = new DavServer({ getConfig: () => store.get(), logger, handler: (a, b, r) => router.handle(a, b, r) });
-  await server.start();
-  const req = (method: string, p: string, headers: http.OutgoingHttpHeaders = {}, body?: string) => new Promise<{ status: number; headers: http.IncomingHttpHeaders; body: string }>((resolve, reject) => {
-    const r = http.request({ host: '127.0.0.1', port: PORT, method, path: p, headers: { Authorization: basic('viewer:ro'), ...headers } }, (res) => {
-      const c: Buffer[] = [];
-      res.on('data', (d) => c.push(d));
-      res.on('end', () => resolve({ status: res.statusCode!, headers: res.headers, body: Buffer.concat(c).toString() }));
-    });
-    r.on('error', reject);
-    if (body !== undefined) r.write(body);
-    r.end();
-  });
-  try {
-    assert.strictEqual((await req('GET', '/A/x.txt')).body, 'hello');
-    assert.strictEqual((await req('PROPFIND', '/A', { Depth: '1' })).status, 207);
-    const o = await req('OPTIONS', '/A');
-    assert.strictEqual(o.headers['dav'], '1');
-    assert.ok(!/PUT|DELETE|MOVE|COPY|MKCOL|PROPPATCH/.test(String(o.headers['allow'])));
-    for (const [m, p, h] of [
-      ['PUT', '/A/new.txt', {}], ['MKCOL', '/B', {}], ['DELETE', '/A/x.txt', {}],
-      ['MOVE', '/A/x.txt', { Destination: `http://127.0.0.1:${PORT}/A/y.txt` }],
-      ['COPY', '/A/x.txt', { Destination: `http://127.0.0.1:${PORT}/A/z.txt` }],
-      ['PROPPATCH', '/A/x.txt', {}]
-    ] as Array<[string, string, http.OutgoingHttpHeaders]>) {
-      assert.strictEqual((await req(m, p, h, m === 'PUT' ? 'x' : undefined)).status, 403, m);
-    }
-    assert.strictEqual((await req('LOCK', '/A/none.txt', { Depth: '0' }, '<D:lockinfo xmlns:D="DAV:"><D:lockscope><D:exclusive/></D:lockscope></D:lockinfo>')).status, 403);
-    assert.strictEqual((await req('LOCK', '/A/x.txt', { Depth: '0' }, '<D:lockinfo xmlns:D="DAV:"><D:lockscope><D:exclusive/></D:lockscope></D:lockinfo>')).status, 200);
-    assert.strictEqual(fake.items.length, 1, '没有任何改动');
-    assert.ok(logger.recent().some((e) => e.role === 'readonly'), '请求日志记录角色');
-  } finally {
-    await server.stop();
-  }
+  assert.strictEqual(a.check(basic('eagle:adminpw'), '2.2.2.2', store.get()), 'ok');
+  assert.strictEqual(a.check(basic('eagle:bad'), '2.2.2.2', store.get()), 'denied');
+  assert.strictEqual(a.check(undefined, '2.2.2.2', store.get()), 'denied');
 });
 
 class FakeChild extends EventEmitter {
@@ -158,13 +96,13 @@ test('客户端识别与汇总', () => {
   assert.strictEqual(friendlyClient('Lavf/61.1.100'), 'ffmpeg');
   assert.strictEqual(friendlyClient(undefined), '未知客户端');
   const now = Date.now();
-  const e = (n: number, ip: string, ua: string, agoMs: number, role?: string): RequestEntry =>
-    ({ n, t: new Date(now - agoMs).toISOString(), ip, method: 'GET', url: '/', status: 200, ms: 5, ua, role });
+  const e = (n: number, ip: string, ua: string, agoMs: number): RequestEntry =>
+    ({ n, t: new Date(now - agoMs).toISOString(), ip, method: 'GET', url: '/', status: 200, ms: 5, ua });
   const list = summarizeClients([
-    e(1, '::ffff:192.168.0.5', 'WebDAVFS/3', 1000, 'admin'), e(2, '::ffff:192.168.0.5', 'WebDAVFS/3', 500, 'admin'),
-    e(3, '192.168.0.9', 'Infuse/8', 100, 'readonly'), e(4, '192.168.0.7', 'curl/8', 10 * 60_000)
+    e(1, '::ffff:192.168.0.5', 'WebDAVFS/3', 1000), e(2, '::ffff:192.168.0.5', 'WebDAVFS/3', 500),
+    e(3, '192.168.0.9', 'Infuse/8', 100), e(4, '192.168.0.7', 'curl/8', 10 * 60_000)
   ], now);
-  assert.deepStrictEqual(list.map((c) => [c.client, c.ip, c.requests, c.role]), [['Infuse', '192.168.0.9', 1, 'readonly'], ['Finder', '192.168.0.5', 2, 'admin']]);
+  assert.deepStrictEqual(list.map((c) => [c.client, c.ip, c.requests]), [['Infuse', '192.168.0.9', 1], ['Finder', '192.168.0.5', 2]]);
 });
 
 test('重复添加提示：给出提示，条目入库后自动撤销', async () => {

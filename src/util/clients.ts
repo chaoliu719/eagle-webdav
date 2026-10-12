@@ -18,7 +18,6 @@ export function friendlyClient(ua: string | undefined): string {
 export interface ClientSummary {
   ip: string;
   client: string;
-  role?: string;
   requests: number;
   lastSeen: number;
 }
@@ -31,10 +30,9 @@ export function summarizeClients(entries: RequestEntry[], now: number, windowMs 
     if (now - t > windowMs) continue;
     const client = friendlyClient(e.ua);
     const key = `${e.ip}|${client}`;
-    const cur = map.get(key) ?? { ip: e.ip.replace(/^::ffff:/, ''), client, role: e.role, requests: 0, lastSeen: 0 };
+    const cur = map.get(key) ?? { ip: e.ip.replace(/^::ffff:/, ''), client, requests: 0, lastSeen: 0 };
     cur.requests++;
     cur.lastSeen = Math.max(cur.lastSeen, t);
-    if (e.role) cur.role = e.role;
     map.set(key, cur);
   }
   return Array.from(map.values()).sort((a, b) => b.lastSeen - a.lastSeen);

@@ -3,13 +3,13 @@ import type { Socket } from 'net';
 import type { Config } from '../config/config';
 import type { Logger } from '../util/log';
 import { isAllowedAddress } from './access';
-import { Authenticator, type Role } from './auth';
+import { Authenticator } from './auth';
 
 export interface ServerDeps {
   getConfig(): Config;
   logger: Logger;
   /** 通过认证后的请求处理器（DAV 路由）。 */
-  handler(req: http.IncomingMessage, res: http.ServerResponse, role: Role): Promise<void>;
+  handler(req: http.IncomingMessage, res: http.ServerResponse): Promise<void>;
   /** 请求开始 / 结束的回调（防休眠等用）。 */
   activity?: { begin(): void; end(): void };
   auth?: Authenticator;
@@ -20,6 +20,9 @@ export interface ListenInfo {
   port: number;
   ipv6: boolean;
 }
+
+/** 会读写文件内容的方法。 */
+const TRANSFER_METHODS = new Set(['GET', 'PUT', 'COPY', 'MOVE']);
 
 const REALM = 'Eagle WebDAV';
 const SERVER_NAME = 'EagleWebdav/0.1';
@@ -102,7 +105,7 @@ export class DavServer {
   private handle(req: http.IncomingMessage, res: http.ServerResponse, viaContinue: boolean): void {
     const cfg = this.deps.getConfig();
     const ip = req.socket.remoteAddress ?? '';
-    if (!isAllowedAddress(ip, cfg.extraAllowedCidrs)) {
+    if (!isAllowedAddress(ip)) {
       this.deps.logger.warn(`拒绝来源 ${ip}`);
       req.socket.destroy();
       return;
@@ -111,16 +114,18 @@ export class DavServer {
     const n = ++this.counter;
     const started = Date.now();
     let done = false;
-    let role: Role | undefined;
-    this.deps.activity?.begin();
+    // 只有真正在传文件的请求才算「在用」；浏览目录、心跳（PROPFIND / OPTIONS / LOCK 等）不阻止休眠，
+    // 否则 Finder 挂着一个空闲的卷也会让 Mac 永远睡不着
+    const tracked = TRANSFER_METHODS.has(req.method ?? '');
+    if (tracked) this.deps.activity?.begin();
     const record = (status: number | 'aborted') => {
       if (done) return;
       done = true;
-      this.deps.activity?.end();
+      if (tracked) this.deps.activity?.end();
       this.deps.logger.request({
         n, t: new Date(started).toISOString(), ip, method: req.method ?? '', url: req.url ?? '',
         status, ms: Date.now() - started,
-        ua: req.headers['user-agent'], depth: req.headers['depth'] as string | undefined, role,
+        ua: req.headers['user-agent'], depth: req.headers['depth'] as string | undefined,
         range: req.headers['range'] as string | undefined,
         contentRange: res.getHeader('content-range') as string | undefined,
         length: res.getHeader('content-length') === undefined ? undefined : String(res.getHeader('content-length'))
@@ -129,9 +134,7 @@ export class DavServer {
     res.on('finish', () => record(res.statusCode));
     res.on('close', () => record('aborted'));
 
-    const login = this.auth.login(req.headers['authorization'], ip, cfg);
-    const verdict = login.result;
-    role = login.role;
+    const verdict = this.auth.check(req.headers['authorization'], ip, cfg);
     if (verdict === 'banned') {
       req.resume();
       return this.send(res, 403, { Connection: 'close' }, 'Forbidden');
@@ -150,7 +153,7 @@ export class DavServer {
       return this.send(res, 503, { 'Retry-After': '5' }, 'Service Unavailable');
     }
 
-    this.deps.handler(req, res, role as Role).catch((err: Error) => {
+    this.deps.handler(req, res).catch((err: Error) => {
       this.deps.logger.error(`处理 ${req.method} ${req.url} 失败：${err.message}`);
       if (!res.headersSent) this.send(res, 500, {}, 'Internal Server Error');
       else res.destroy();

@@ -24,9 +24,6 @@ export interface SettingsForm {
   username: string;
   /** 密码：null = 不修改；'' = 清除；其他 = 设置为该值。 */
   password: string | null;
-  readonlyUsername: string;
-  readonlyPassword: string | null;
-  cidrs: string[];
   bonjour: boolean;
   preventSleep: boolean;
 }
@@ -46,9 +43,6 @@ export interface InitialSettings {
   port: number;
   username: string;
   hasPassword: boolean;
-  readonlyUsername: string;
-  hasReadonlyPassword: boolean;
-  cidrs: string[];
   bonjour: boolean;
   preventSleep: boolean;
 }
@@ -87,13 +81,13 @@ export class StatusView {
     for (const [label, value] of options) sel.add(new Option(label, value));
 
     this.applySettings(initial);
-    for (const id of ['host', 'port', 'user', 'pass', 'rouser', 'ropass', 'cidrs', 'bonjour', 'nosleep']) {
+    for (const id of ['host', 'port', 'user', 'pass', 'bonjour', 'nosleep']) {
       const el = $(id);
       el.addEventListener('input', () => this.updateDirty());
       el.addEventListener('change', () => this.updateDirty());
     }
 
-    for (const id of ['pass', 'ropass']) {
+    for (const id of ['pass']) {
       const el = $<HTMLInputElement>(id);
       // 点进去全选黑点，直接输入就是替换；清空则表示清除密码（点「放弃」可恢复）
       el.addEventListener('focus', () => { if (el.value === MASK) el.select(); });
@@ -110,9 +104,6 @@ export class StatusView {
     $<HTMLInputElement>('port').value = String(s.port);
     $<HTMLInputElement>('user').value = s.username;
     this.setPassword('pass', s.hasPassword, '未设置');
-    $<HTMLInputElement>('rouser').value = s.readonlyUsername;
-    this.setPassword('ropass', s.hasReadonlyPassword, '未启用');
-    $<HTMLInputElement>('cidrs').value = s.cidrs.join(', ');
     $<HTMLInputElement>('bonjour').checked = s.bonjour;
     $<HTMLInputElement>('nosleep').checked = s.preventSleep;
     this.baseline = JSON.stringify(this.readForm());
@@ -140,9 +131,6 @@ export class StatusView {
       port: parseInt($<HTMLInputElement>('port').value, 10) || 0,
       username: $<HTMLInputElement>('user').value.trim(),
       password: this.passwordValue('pass'),
-      readonlyUsername: $<HTMLInputElement>('rouser').value.trim(),
-      readonlyPassword: this.passwordValue('ropass'),
-      cidrs: $<HTMLInputElement>('cidrs').value.split(/[,\s]+/).map((c) => c.trim()).filter(Boolean),
       bonjour: $<HTMLInputElement>('bonjour').checked,
       preventSleep: $<HTMLInputElement>('nosleep').checked
     };
@@ -179,7 +167,7 @@ export class StatusView {
   }
 
   setSleepState(active: boolean, enabled: boolean): void {
-    $('sleep').textContent = enabled && active ? '正在阻止 Mac 休眠（有客户端连接中）。' : '';
+    $('sleep').textContent = enabled && active ? '正在阻止 Mac 休眠（有文件传输）。' : '';
   }
 
   renderLog(force: boolean): void {
@@ -209,10 +197,10 @@ export class StatusView {
     if (!list.length) {
       body.innerHTML = '<tr><td class="mut">（尚无连接）</td></tr>';
     } else {
-      body.innerHTML = '<tr><th>客户端</th><th>地址</th><th>账号</th><th>请求数</th><th>最近</th></tr>';
+      body.innerHTML = '<tr><th>客户端</th><th>地址</th><th>请求数</th><th>最近</th></tr>';
       for (const c of list.slice(0, 8)) {
         const tr = document.createElement('tr');
-        for (const t of [c.client, c.ip, c.role === 'readonly' ? '只读' : '管理', String(c.requests), ago(now - c.lastSeen)]) {
+        for (const t of [c.client, c.ip, String(c.requests), ago(now - c.lastSeen)]) {
           const td = document.createElement('td');
           td.textContent = t;
           tr.append(td);

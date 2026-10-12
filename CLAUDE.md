@@ -10,7 +10,7 @@
 ## 已确认的产品决策
 - 第一版全功能：OPTIONS、PROPFIND、GET/HEAD、PUT、MKCOL、DELETE、MOVE、COPY、PROPPATCH、LOCK/UNLOCK
 - 条目 DELETE = 把整个条目移入 Eagle 回收站（"一删全删"）；文件夹 DELETE 返回 403
-- 仅局域网（来源地址白名单），Basic 认证，默认端口 41600。**管理密码留空 = 不做认证，任何访问都当管理账号，也允许监听非本机地址**（用户明确要求，不再为用户做额外的安全限制）；设了管理密码才启用认证，只读账号仅在设了密码后才有意义
+- 仅局域网（来源地址白名单），Basic 认证，默认端口 41600。**管理密码留空 = 不做认证，任何访问都当管理账号，也允许监听非本机地址**（用户明确要求，不再为用户做额外的安全限制）；设了管理密码才启用认证。**只读账号功能已按用户要求整体删除**（配置、认证角色、窗口、测试都不再有）；「额外允许的来源网段」也已删除，来源只按内置的内网/回环白名单过滤
 - PROPFIND Depth: infinity 返回 403 `propfind-finite-depth`
 
 ## 实测事实（Eagle 4.0.0 Build 23，macOS arm64）
@@ -55,8 +55,7 @@ PUT 先写影子暂存区，`addFromPath` 加 20s 超时；超时返回 `415` �
 ## 体验增强（已真机验证）
 - 状态窗口：自动发现 / 防休眠状态、最近连接的客户端（「连接地址」小节含复制按钮与二维码，按用户要求已删除，依赖 `qrcode-generator` 同时移除；局域网 IP 仍可在「设置 → 监听地址」下拉框里看到）（按 User-Agent 识别 Finder / Infuse / rclone 等）、提示横幅（可「忽略」）。`198.18.0.0/15`（Surge 虚拟网卡）不列入监听地址下拉框
 - Bonjour：Infuse 的发现列表里能看到（真机确认），**Finder 的「网络」不会列出 `_webdav._tcp`（真机确认），Finder 仍须 ⌘K 手输地址**；`dns-sd -R "Eagle WebDAV (主机名)" _webdav._tcp local <端口>`，仅对局域网开放时注册；子进程在页面 `pagehide`、停止、退出时结束，启动时 `pkill -f 'dns-sd -R Eagle WebDAV'` 清理上次遗留
-- 防休眠：有请求时起 `caffeinate -i -w <进程号>`，空闲 60s 结束（`-w` 保证宿主进程退出后它也退出）
-- 只读账号（默认用户名 `viewer`）：写入类方法 403，`OPTIONS` 以 `DAV: 1` 通告（Finder 只读挂载），LOCK 不存在的路径 403
+- 防休眠：**只有传输类请求（GET / PUT / COPY / MOVE）才计入**，浏览目录与心跳（PROPFIND / OPTIONS / LOCK / HEAD）不计，否则 Finder 挂着空闲的卷（实测 258 个请求多是心跳）会让 Mac 永远睡不着；有传输时起 `caffeinate -i -w <进程号>`，最后一次传输结束后再留 60s 才放开（给播放器请求间隙，防止播到一半睡着），`-w` 保证宿主进程退出后它也退出。窗口里的提示在这 60s 缓冲期内也会显示
 - 重复添加提示：`importAt` 后按**目录列表**确认条目是否出现（`getById` 在弹提示时就已能返回条目，不能用来判断）；没出现就给横幅并用 `eagle.notification.show` 通知，后台每 5s 轮询，入库后自动撤销，10 分钟放弃。实测 Eagle 把多个重复提示合并处理时可能丢掉后面的导入
 
 ## 仍未验证
@@ -79,7 +78,7 @@ Infuse 与 iPad 实机、Finder 图形界面的拖拽、几十万条的真实大
 - `modifiedAt` 新导入为 0，且 `replaceFile` 不更新它：`LibraryIndex.normalize` 取 `modifiedAt || importedAt`，再与本服务替换内容的时间取较大者，ETag 才会随内容变化；Eagle 界面里同大小的外部替换仍无法察觉
 - 未知扩展名（如 `.xyz`）导入正常（约 80ms，无对话框）；只有无扩展名会卡住并弹窗，所以服务直接返回 415。覆盖时"换扩展名"不会发生：同一路径的扩展名必然相同
 - 吞吐（本机）：80MB PUT 约 3s，GET 约 0.1s；Range 读末尾 1MB 约 40ms；ffprobe / ffmpeg 通过 HTTP 读 mp4（moov 在尾/在头）与 mkv 并 `-ss` 跳转均正常（可代表 Infuse 的取流方式）
-- 补齐项（已真机验证）：写入类方法支持 `If-Match` / `If-None-Match`（412）；LOCK 永不拒绝并对不存在的 URL 建占位（Finder 崩溃留下的旧锁不会把自己锁死）；`E:width` / `E:height`；上传 120s 空闲中止；启动时清理上次遗留的临时目录、退出时 `dispose()`；状态窗口可填「额外允许的来源网段」
+- 补齐项（已真机验证）：写入类方法支持 `If-Match` / `If-None-Match`（412）；LOCK 永不拒绝并对不存在的 URL 建占位（Finder 崩溃留下的旧锁不会把自己锁死）；`E:width` / `E:height`；上传 120s 空闲中止；启动时清理上次遗留的临时目录、退出时 `dispose()`
 - 未做：litmus 协议合规测试（homebrew 里没有，需手动编译）；dead 属性不落盘；真实锁语义（有意不做）；目录 `getlastmodified` 取目录创建时间而非内部最新修改
 - M0 探针已停用（用户不再使用）；本插件监听 0.0.0.0:41600
 - 窗口界面（`plugin/index.html` + `src/ui/status.ts`）可不装进 Eagle 直接预览与点测：`node test/dev/ui-preview.mjs`，再用浏览器打开 `http://127.0.0.1:41777/`（`?pw=1` 模拟已设置密码）。已设置的密码在输入框里显示为 10 个黑点占位：黑点 = 不修改；清空 = 清除密码（保存后哈希置 null，即不再认证）；输入新内容 = 设置新密码；点进去自动全选，点「放弃」恢复；设置区有「保存」「放弃」，保存会校验后写配置并自动启动/重启，改动前两个按钮是灰的

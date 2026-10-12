@@ -5,7 +5,6 @@ import { ConfigStore } from './config/config';
 import { MIN_BUILD, type EagleAdapter } from './eagle/adapter';
 import { RealEagleAdapter, userDataDir } from './eagle/realAdapter';
 import { DavRouter } from './dav/router';
-import { parseCidr } from './http/access';
 import { DavServer } from './http/server';
 import { LibraryIndex } from './index/libraryIndex';
 import { StatusView, type InitialSettings, type SettingsForm } from './ui/status';
@@ -28,7 +27,7 @@ const router = new DavRouter(adapter, index, logger, { tagsView: () => store.get
 const sleepGuard = new SleepGuard({ enabled: () => store.get().preventSleep });
 const bonjour = new Bonjour();
 const server = new DavServer({
-  getConfig: () => store.get(), logger, handler: (req, res, role) => router.handle(req, res, role),
+  getConfig: () => store.get(), logger, handler: (req, res) => router.handle(req, res),
   activity: { begin: () => sleepGuard.begin(), end: () => sleepGuard.end() }
 });
 // 需要用户注意的事（如 Eagle 在等「重复添加提示」确认）同时用 Eagle 自带的通知提醒一次
@@ -77,8 +76,7 @@ function currentSettings(): InitialSettings {
   const c = store.get();
   return {
     host: c.host, port: c.port, username: c.username, hasPassword: !!c.passwordHash,
-    readonlyUsername: c.readonlyUsername, hasReadonlyPassword: !!c.readonlyPasswordHash,
-    cidrs: c.extraAllowedCidrs, bonjour: c.bonjour, preventSleep: c.preventSleep
+    bonjour: c.bonjour, preventSleep: c.preventSleep
   };
 }
 
@@ -90,21 +88,14 @@ async function save(form: SettingsForm): Promise<void> {
   const fail = (msg: string) => view.setStatus(msg, true);
   if (!form.username) return fail('管理账号的用户名不能为空');
   if (!Number.isInteger(form.port) || form.port < 1 || form.port > 65535) return fail('端口必须是 1 到 65535 之间的数字');
-  if (form.readonlyUsername && form.readonlyUsername === form.username) return fail('只读账号的用户名不能和管理账号相同');
-  const bad = form.cidrs.filter((c) => parseCidr(c) === null);
-  if (bad.length) return fail(`网段格式不对：${bad.join('、')}（应形如 100.64.0.0/10）`);
 
   saving = true;
   view.setSaving(true);
   try {
     if (form.password === '') store.update({ passwordHash: null });
     else if (form.password !== null) store.setPassword(form.password);
-    if (form.readonlyPassword === '') store.update({ readonlyPasswordHash: null });
-    else if (form.readonlyPassword !== null) store.setReadonlyPassword(form.readonlyPassword);
     store.update({
       host: form.host, port: form.port, username: form.username,
-      readonlyUsername: form.readonlyUsername || 'viewer',
-      extraAllowedCidrs: form.cidrs,
       bonjour: form.bonjour, preventSleep: form.preventSleep
     });
     view.applySettings(currentSettings());

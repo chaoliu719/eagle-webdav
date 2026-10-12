@@ -9,15 +9,10 @@ export interface Config {
   username: string;
   /** scrypt$N$salt(hex)$hash(hex)；null 表示尚未设置密码。 */
   passwordHash: string | null;
-  /** 在内网默认白名单之外额外允许的 IPv4 网段，如 "100.64.0.0/10"。 */
-  extraAllowedCidrs: string[];
   /** 是否暴露只读的「@标签」视图。 */
   tagsView: boolean;
   /** Eagle 启动后自动监听。 */
   autoStart: boolean;
-  /** 只读账号：只能读取，写入类方法一律 403，并以 DAV: 1 通告（Finder 会只读挂载）。 */
-  readonlyUsername: string;
-  readonlyPasswordHash: string | null;
   /** 用 Bonjour（dns-sd）广播 _webdav._tcp，Infuse 等 App 能自动发现（Finder 的「网络」不会列出 WebDAV，实测）。仅 macOS。 */
   bonjour: boolean;
   /** 有客户端连接时阻止 Mac 休眠（caffeinate）。仅 macOS。 */
@@ -29,11 +24,8 @@ export const DEFAULT_CONFIG: Config = {
   port: 41600,
   username: 'eagle',
   passwordHash: null,
-  extraAllowedCidrs: [],
   tagsView: true,
   autoStart: true,
-  readonlyUsername: 'viewer',
-  readonlyPasswordHash: null,
   bonjour: true,
   preventSleep: true
 };
@@ -69,11 +61,8 @@ function sanitize(raw: unknown): Config {
     port: Number.isInteger(port) && port > 0 && port < 65536 ? port : d.port,
     username: typeof r.username === 'string' && r.username ? r.username : d.username,
     passwordHash: typeof r.passwordHash === 'string' && r.passwordHash ? r.passwordHash : null,
-    extraAllowedCidrs: Array.isArray(r.extraAllowedCidrs) ? r.extraAllowedCidrs.filter((x): x is string => typeof x === 'string') : [],
     tagsView: typeof r.tagsView === 'boolean' ? r.tagsView : d.tagsView,
     autoStart: typeof r.autoStart === 'boolean' ? r.autoStart : d.autoStart,
-    readonlyUsername: typeof r.readonlyUsername === 'string' && r.readonlyUsername ? r.readonlyUsername : d.readonlyUsername,
-    readonlyPasswordHash: typeof r.readonlyPasswordHash === 'string' && r.readonlyPasswordHash ? r.readonlyPasswordHash : null,
     bonjour: typeof r.bonjour === 'boolean' ? r.bonjour : d.bonjour,
     preventSleep: typeof r.preventSleep === 'boolean' ? r.preventSleep : d.preventSleep
   };
@@ -97,7 +86,7 @@ export class ConfigStore {
     return this.get();
   }
 
-  get(): Config { return { ...this.current, extraAllowedCidrs: [...this.current.extraAllowedCidrs] }; }
+  get(): Config { return { ...this.current }; }
 
   update(patch: Partial<Config>): Config {
     this.current = sanitize({ ...this.current, ...patch });
@@ -112,7 +101,4 @@ export class ConfigStore {
     return this.update({ passwordHash: hashPassword(password) });
   }
 
-  setReadonlyPassword(password: string): Config {
-    return this.update({ readonlyPasswordHash: hashPassword(password) });
-  }
 }

@@ -8,7 +8,6 @@ export interface RequestEntry {
   ms: number;
   ua?: string;
   depth?: string;
-  role?: string;
   /** 请求的 Range 头与响应的 Content-Range / Content-Length，排查流媒体客户端用。 */
   range?: string;
   contentRange?: string;

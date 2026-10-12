@@ -8,7 +8,6 @@ import type { LibraryIndex } from '../index/libraryIndex';
 import type { Logger } from '../util/log';
 import { KeyedMutex } from '../util/mutex';
 import { ShadowStore } from '../vfs/shadow';
-import type { Role } from '../http/auth';
 import { Resolver, isCollection, isTagsView, pathKey, type Resolved } from '../vfs/resolver';
 import type { DavContext } from './context';
 import { handleDelete } from './handlers/delete';
@@ -27,8 +26,6 @@ const MAX_XML_BODY = 1024 * 1024;
 const YIELD_EVERY = 500;
 const WARN_ENTRIES = 20000;
 
-const WRITE_METHODS = new Set(['PUT', 'MKCOL', 'DELETE', 'MOVE', 'COPY', 'PROPPATCH']);
-const ALLOW_READONLY = 'OPTIONS, GET, HEAD, PROPFIND, LOCK, UNLOCK';
 const ALLOW_MISSING = 'OPTIONS, LOCK, PUT, MKCOL';
 // 与 Go net/http webdav 一致：集合不含 GET/HEAD（见 CLAUDE.md 的 Finder 卡顿修复）
 const ALLOW_DIR = 'OPTIONS, LOCK, DELETE, PROPPATCH, COPY, MOVE, UNLOCK, PROPFIND';
@@ -74,16 +71,12 @@ export class DavRouter {
     this.index.invalidate();
   }
 
-  async handle(req: http.IncomingMessage, res: http.ServerResponse, role: Role = 'admin'): Promise<void> {
+  async handle(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     const method = req.method ?? '';
-    if (role === 'readonly' && WRITE_METHODS.has(method)) {
-      req.resume();
-      return send(res, 403, { Connection: 'close' }, '只读账号不能修改');
-    }
     const parsed = parseRequestPath(req.url ?? '');
     if (!parsed) { req.resume(); return send(res, 400, {}, 'Bad path'); }
     switch (method) {
-      case 'OPTIONS': return this.options(req, res, parsed.segs, role);
+      case 'OPTIONS': return this.options(req, res, parsed.segs);
       case 'PROPFIND': return this.propfind(req, res, parsed.segs);
       case 'GET':
       case 'HEAD': return this.get(req, res, parsed.segs);
@@ -93,7 +86,7 @@ export class DavRouter {
       case 'MOVE': return handleTransfer(this.ctx, req, res, parsed.segs, true);
       case 'COPY': return handleTransfer(this.ctx, req, res, parsed.segs, false);
       case 'PROPPATCH': return handleProppatch(this.ctx, req, res, parsed.segs);
-      case 'LOCK': return this.lock(req, res, parsed.segs, role);
+      case 'LOCK': return this.lock(req, res, parsed.segs);
       case 'UNLOCK': return this.unlock(req, res);
       default:
         req.resume();
@@ -101,12 +94,8 @@ export class DavRouter {
     }
   }
 
-  private async options(req: http.IncomingMessage, res: http.ServerResponse, segs: string[], role: Role): Promise<void> {
+  private async options(req: http.IncomingMessage, res: http.ServerResponse, segs: string[]): Promise<void> {
     req.resume();
-    if (role === 'readonly') {
-      // 只通告 Class 1：Finder 不会申请锁，按只读卷挂载
-      return send(res, 200, { DAV: '1', Allow: ALLOW_READONLY, 'MS-Author-Via': 'DAV' });
-    }
     const r = await this.resolver.resolve(segs);
     const isFile = r && (r.kind === 'item' || (r.kind === 'shadow' && !r.entry.isDir));
     const allow = !r ? ALLOW_MISSING : isFile ? ALLOW_FILE : ALLOW_DIR;
@@ -181,7 +170,7 @@ export class DavRouter {
   }
 
   // ---------- 假锁 ----------
-  private async lock(req: http.IncomingMessage, res: http.ServerResponse, segs: string[], role: Role): Promise<void> {
+  private async lock(req: http.IncomingMessage, res: http.ServerResponse, segs: string[]): Promise<void> {
     const body = (await readBody(req, MAX_XML_BODY)).toString('utf8');
     if (hasDoctype(body)) return send(res, 400, {}, 'DOCTYPE not allowed');
     const timeoutSec = parseTimeout(req.headers['timeout']);
@@ -202,7 +191,6 @@ export class DavRouter {
     // 若拒绝会让它在锁过期前一直无法写入。这是有意的非强制实现。
     const r = await this.resolver.resolve(segs);
     if (!r) {
-      if (role === 'readonly') return send(res, 403, {}, '只读账号不能创建文件');
       // 对不存在的 URL 加锁：在影子区建一个空占位（RFC 4918 的"锁定空资源"），父目录不存在返回 409
       if (segs.length === 0) return send(res, 409, {}, 'Conflict');
       const parent = await this.resolver.resolve(segs.slice(0, -1));

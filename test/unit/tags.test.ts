@@ -28,7 +28,7 @@ const logger = new RingLogger();
 const index = new LibraryIndex(fake);
 let tagsView = true;
 const router = new DavRouter(fake, index, logger, { tagsView: () => tagsView, tmpRoot: path.join(dir, 'put') });
-const server = new DavServer({ getConfig: () => store.get(), logger, handler: (x, y, r) => router.handle(x, y, r) });
+const server = new DavServer({ getConfig: () => store.get(), logger, handler: (x, y) => router.handle(x, y) });
 
 const AUTH = { Authorization: 'Basic ' + Buffer.from('u:p').toString('base64') };
 const enc = (p: string) => p.split('/').map((x) => encodeURIComponent(x)).join('/');

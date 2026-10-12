@@ -5,23 +5,25 @@ import type { ShadowEntry, ShadowStore } from './shadow';
 
 export const UNCATEGORIZED = '@未分类';
 export const TAGS_VIEW = '@标签';
+export const ALL_VIEW = '@全部';
 
 export type Resolved =
   | { kind: 'root'; segs: string[] }
   | { kind: 'uncat'; segs: string[] }
+  | { kind: 'all'; segs: string[] }
   | { kind: 'tags'; segs: string[] }
   | { kind: 'tag'; segs: string[]; tag: string }
   | { kind: 'folder'; segs: string[]; folder: FolderInfo }
-  | { kind: 'item'; segs: string[]; item: ItemInfo; parentFolderId: string | null; viaTag?: boolean }
+  | { kind: 'item'; segs: string[]; item: ItemInfo; parentFolderId: string | null; viaView?: boolean }
   | { kind: 'shadow'; segs: string[]; entry: ShadowEntry };
 
 export function isCollection(r: Resolved): boolean {
   return r.kind === 'shadow' ? r.entry.isDir : r.kind !== 'item';
 }
 
-/** 「@标签」视图及其下的条目只读。 */
-export function isTagsView(r: Resolved): boolean {
-  return r.kind === 'tags' || r.kind === 'tag' || (r.kind === 'item' && r.viaTag === true);
+/** 「@标签」「@全部」视图及其下的条目只读。 */
+export function isReadOnlyView(r: Resolved): boolean {
+  return r.kind === 'tags' || r.kind === 'tag' || r.kind === 'all' || (r.kind === 'item' && r.viaView === true);
 }
 
 /** 规范路径，用作锁等按路径索引的键。 */
@@ -34,6 +36,8 @@ type Real = Exclude<Resolved, { kind: 'item' | 'shadow' }>;
 export interface ResolverOptions {
   /** 是否暴露只读的「@标签」视图。 */
   tagsView?: () => boolean;
+  /** 是否暴露只读的「@全部」视图。 */
+  allView?: () => boolean;
 }
 
 export class Resolver {
@@ -44,10 +48,13 @@ export class Resolver {
 
   private tagsEnabled(): boolean { return this.opts.tagsView ? this.opts.tagsView() : false; }
 
+  private allEnabled(): boolean { return this.opts.allView ? this.opts.allView() : false; }
+
   private listingKey(r: Real): string {
     switch (r.kind) {
       case 'root': return 'root';
       case 'uncat': return 'uncat';
+      case 'all': return 'all';
       case 'tags': return 'tags';
       case 'tag': return 'tag:' + r.tag;
       case 'folder': return 'folder:' + r.folder.id;
@@ -57,7 +64,7 @@ export class Resolver {
   private async listing(r: Real): Promise<EntryIndex> {
     // 先做新鲜度检查，再比较修订号
     await this.index.ensureFresh();
-    const key = this.listingKey(r) + (r.kind === 'root' ? (this.tagsEnabled() ? ':t' : '') : '');
+    const key = this.listingKey(r) + (r.kind === 'root' ? (this.tagsEnabled() ? ':t' : '') + (this.allEnabled() ? ':a' : '') : '');
     const hit = this.listings.get(key);
     if (hit && hit.rev === this.index.revision) return hit.index;
     const entries = await this.realChildren(r);
@@ -86,10 +93,13 @@ export class Resolver {
         const virtual: Entry[] = [{ name: UNCATEGORIZED, kind: 'uncat', id: '' }];
         const reserved = [UNCATEGORIZED];
         if (this.tagsEnabled()) { virtual.push({ name: TAGS_VIEW, kind: 'tags', id: '' }); reserved.push(TAGS_VIEW); }
+        if (this.allEnabled()) { virtual.push({ name: ALL_VIEW, kind: 'all', id: '' }); reserved.push(ALL_VIEW); }
         return [...virtual, ...buildEntries(top, [], reserved)];
       }
       case 'uncat':
         return buildEntries([], await this.index.items(null));
+      case 'all':
+        return buildEntries([], await this.index.allItems());
       case 'tags': {
         // 标签名当作"文件夹"走同一套消歧；id 用标签名，冲突后缀取其末尾
         const tags = await this.index.tags();
@@ -128,6 +138,7 @@ export class Resolver {
       const next: string[] = [...cur.segs, hit.name];
       switch (hit.kind) {
         case 'uncat': cur = { kind: 'uncat', segs: next }; break;
+        case 'all': cur = { kind: 'all', segs: next }; break;
         case 'tags': cur = { kind: 'tags', segs: next }; break;
         case 'tag': cur = { kind: 'tag', segs: next, tag: hit.id }; break;
         case 'folder': cur = { kind: 'folder', segs: next, folder: hit.folder as FolderInfo }; break;
@@ -135,7 +146,7 @@ export class Resolver {
           cur = {
             kind: 'item', segs: next, item: hit.item as ItemInfo,
             parentFolderId: cur.kind === 'folder' ? cur.folder.id : null,
-            viaTag: cur.kind === 'tag'
+            viaView: cur.kind === 'tag' || cur.kind === 'all'
           };
       }
     }

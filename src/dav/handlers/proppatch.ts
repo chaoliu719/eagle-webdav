@@ -1,7 +1,7 @@
 import type * as http from 'http';
 import type { ItemPatch } from '../../eagle/adapter';
 import { readBody, send, sendXml } from '../../http/respond';
-import { isTagsView, pathKey } from '../../vfs/resolver';
+import { isReadOnlyView, pathKey } from '../../vfs/resolver';
 import type { DavContext } from '../context';
 import { escXml, hrefOf } from '../path';
 import { hasDoctype, isWellFormed, nsMap } from '../xml';
@@ -51,7 +51,7 @@ export async function handleProppatch(ctx: DavContext, req: http.IncomingMessage
   if (!isWellFormed(body)) return send(res, 400, {}, '请求体不是格式良好的 XML');
   const r = await ctx.resolver.resolve(segs);
   if (!r) return send(res, 404, {}, 'Not Found');
-  if (isTagsView(r)) return send(res, 403, {}, '「@标签」视图只读');
+  if (isReadOnlyView(r)) return send(res, 403, {}, '「@标签」「@全部」视图只读');
   const instrs = parseInstructions(body);
   if (!instrs.length) return send(res, 400, {}, '没有有效的 set / remove 指令');
 

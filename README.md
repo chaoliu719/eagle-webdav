@@ -6,7 +6,7 @@
 
 把 [Eagle](https://eagle.cool) 资源库以 WebDAV 暴露给 Finder、Infuse、rclone 等客户端的后台服务插件。插件内用 Node `http` 手写最小 WebDAV 服务，不依赖第三方 WebDAV 库。
 
-- Eagle 文件夹树就是目录树；另有可写的 `@未分类` 和只读的 `@标签` 虚拟目录
+- Eagle 文件夹树就是目录树；另有可写的 `@未分类`、只读的 `@标签` 和平铺列出全库的只读 `@全部` 虚拟目录
 - 读：PROPFIND、GET / HEAD（Range、条件请求）
 - 写：PUT、MKCOL、DELETE（进回收站）、MOVE、COPY、PROPPATCH、LOCK / UNLOCK
 - 仅局域网，Basic 认证，默认端口 41600

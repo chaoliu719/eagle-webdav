@@ -8,7 +8,7 @@ import type { LibraryIndex } from '../index/libraryIndex';
 import type { Logger } from '../util/log';
 import { KeyedMutex } from '../util/mutex';
 import { ShadowStore } from '../vfs/shadow';
-import { Resolver, isCollection, isTagsView, pathKey, type Resolved } from '../vfs/resolver';
+import { Resolver, isCollection, isReadOnlyView, pathKey, type Resolved } from '../vfs/resolver';
 import type { DavContext } from './context';
 import { handleDelete } from './handlers/delete';
 import { handleMkcol } from './handlers/mkcol';
@@ -45,10 +45,10 @@ export class DavRouter {
 
   constructor(
     private adapter: EagleAdapter, private index: LibraryIndex, private logger: Logger,
-    opts: { maxPut?: number; tmpRoot?: string; shadowDir?: string; tagsView?: () => boolean } = {}
+    opts: { maxPut?: number; tmpRoot?: string; shadowDir?: string; tagsView?: () => boolean; allView?: () => boolean } = {}
   ) {
     this.shadow = new ShadowStore(Date.now, opts.shadowDir);
-    this.resolver = new Resolver(index, this.shadow, { tagsView: opts.tagsView });
+    this.resolver = new Resolver(index, this.shadow, { tagsView: opts.tagsView, allView: opts.allView });
     this.ctx = {
       adapter, index, resolver: this.resolver, locks: this.locks, shadow: this.shadow, logger, mutex: new KeyedMutex(),
       tmpRoot: opts.tmpRoot ?? path.join(os.tmpdir(), 'eagle-webdav', 'put'),
@@ -196,7 +196,7 @@ export class DavRouter {
       if (segs.length === 0) return send(res, 409, {}, 'Conflict');
       const parent = await this.resolver.resolve(segs.slice(0, -1));
       if (!parent || !isCollection(parent)) return send(res, 409, {}, '父目录不存在');
-      if (parent.kind === 'root' || isTagsView(parent)) return send(res, 403, {}, '这里不能创建文件');
+      if (parent.kind === 'root' || isReadOnlyView(parent)) return send(res, 403, {}, '这里不能创建文件');
       this.shadow.putFile(pathKey([...parent.segs, segs[segs.length - 1]]), segs[segs.length - 1], null, 0);
     }
     const lock = this.locks.create(segs, scope, depth, owner, timeoutSec);

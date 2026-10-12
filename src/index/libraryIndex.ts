@@ -119,6 +119,10 @@ export class LibraryIndex {
     return this.cachedItemsFor('t:' + tag, () => this.adapter.getItemsByTag(tag));
   }
 
+  allItems(): Promise<ItemInfo[]> {
+    return this.cachedItemsFor('all', () => this.adapter.getAllItems());
+  }
+
   private async cachedItemsFor(key: string, load: () => Promise<ItemInfo[]>): Promise<ItemInfo[]> {
     await this.ensureFresh();
     let p = this.itemPromises.get(key);

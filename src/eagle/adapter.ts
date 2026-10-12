@@ -77,6 +77,8 @@ export interface EagleAdapter {
   getTags(): Promise<string[]>;
   /** 带某标签的条目（可属于任意文件夹）。 */
   getItemsByTag(tag: string): Promise<ItemInfo[]>;
+  /** 全库所有条目（不过滤）。 */
+  getAllItems(): Promise<ItemInfo[]>;
 
   // ---------- 写入 ----------
   createFolder(name: string, parentId: string | null): Promise<FolderInfo>;

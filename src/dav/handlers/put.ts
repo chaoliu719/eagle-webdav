@@ -5,7 +5,7 @@ import { Transform } from 'stream';
 import { pipeline } from 'stream/promises';
 import { send } from '../../http/respond';
 import { isSystemName } from '../../vfs/shadow';
-import { isCollection, isTagsView, pathKey } from '../../vfs/resolver';
+import { isCollection, isReadOnlyView, pathKey } from '../../vfs/resolver';
 import { writePreconditionFailed } from '../conditional';
 import type { DavContext } from '../context';
 import { etagOf } from '../props';
@@ -38,7 +38,7 @@ export async function handlePut(ctx: DavContext, req: http.IncomingMessage, res:
   if (!parent || !isCollection(parent)) return reject(req, res, 409, '父目录不存在');
   const target = await ctx.resolver.resolve(segs);
   if (target && isCollection(target)) return reject(req, res, 405, '目标是集合');
-  if (isTagsView(parent) || (target && isTagsView(target))) return reject(req, res, 403, '「@标签」视图只读');
+  if (isReadOnlyView(parent) || (target && isReadOnlyView(target))) return reject(req, res, 403, '「@标签」「@全部」视图只读');
 
   const targetEtag = target?.kind === 'item' ? etagOf(ctx.index.normalize(target.item)) : target ? '"shadow"' : null;
   if (target?.kind !== 'shadow' && writePreconditionFailed(req.headers, targetEtag)) return reject(req, res, 412, 'Precondition Failed');

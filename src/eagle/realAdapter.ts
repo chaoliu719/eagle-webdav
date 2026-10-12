@@ -181,6 +181,11 @@ export class RealEagleAdapter implements EagleAdapter {
     return (await api().item.get({ tags: [tag] })).map(toItem);
   }
 
+  async getAllItems(): Promise<ItemInfo[]> {
+    // 实测：不带过滤条件等于全库（与 { folders: [] } 同理）
+    return (await api().item.get({})).map(toItem);
+  }
+
   async getItemFile(id: string): Promise<ItemFile | null> {
     const it = await api().item.getById(id);
     if (!it || it.isDeleted || !it.filePath) return null;

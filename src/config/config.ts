@@ -12,6 +12,8 @@ export interface Config {
   passwordHash: string | null;
   /** 是否暴露只读的「@标签」视图。 */
   tagsView: boolean;
+  /** 是否暴露只读的「@全部」视图（平铺列出全库条目）。只在配置文件里改，窗口里没有开关。 */
+  allView: boolean;
   /** Eagle 启动后自动监听。 */
   autoStart: boolean;
   /** 用 Bonjour（dns-sd）广播 _webdav._tcp，Infuse 等 App 能自动发现（Finder 的「网络」不会列出 WebDAV，实测）。仅 macOS。 */
@@ -26,6 +28,7 @@ export const DEFAULT_CONFIG: Config = {
   username: 'eagle',
   passwordHash: null,
   tagsView: true,
+  allView: true,
   autoStart: true,
   bonjour: true,
   preventSleep: true
@@ -63,6 +66,7 @@ function sanitize(raw: unknown): Config {
     username: typeof r.username === 'string' && r.username ? r.username : d.username,
     passwordHash: typeof r.passwordHash === 'string' && r.passwordHash ? r.passwordHash : null,
     tagsView: typeof r.tagsView === 'boolean' ? r.tagsView : d.tagsView,
+    allView: typeof r.allView === 'boolean' ? r.allView : d.allView,
     autoStart: typeof r.autoStart === 'boolean' ? r.autoStart : d.autoStart,
     bonjour: typeof r.bonjour === 'boolean' ? r.bonjour : d.bonjour,
     preventSleep: typeof r.preventSleep === 'boolean' ? r.preventSleep : d.preventSleep

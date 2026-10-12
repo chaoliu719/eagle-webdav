@@ -23,7 +23,7 @@ const adapter: EagleAdapter = new RealEagleAdapter();
 // 上次异常退出可能遗留的临时文件（PUT 缓冲、影子暂存区）
 try { fs.rmSync(path.join(os.tmpdir(), 'eagle-webdav'), { recursive: true, force: true }); } catch { /* ignore */ }
 const index = new LibraryIndex(adapter);
-const router = new DavRouter(adapter, index, logger, { tagsView: () => store.get().tagsView });
+const router = new DavRouter(adapter, index, logger, { tagsView: () => store.get().tagsView, allView: () => store.get().allView });
 const sleepGuard = new SleepGuard({ enabled: () => store.get().preventSleep });
 // 自动发现起不来、或中途退出：开关下方给一行黄字（没有别的副作用，服务本身不受影响）
 const bonjour = new Bonjour({ onFail: () => view.setBonjourNote('自动发现没能启动，其他设备需要手动输入地址。') });

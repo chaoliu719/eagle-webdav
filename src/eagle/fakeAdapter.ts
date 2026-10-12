@@ -110,6 +110,10 @@ export class FakeEagleAdapter implements EagleAdapter {
     return this.items.filter((i) => i.tags.includes(tag)).map(({ filePath: _p, ...rest }) => ({ ...rest }));
   }
 
+  async getAllItems(): Promise<ItemInfo[]> {
+    return this.items.map(({ filePath: _p, ...rest }) => ({ ...rest }));
+  }
+
   async getFolders(): Promise<FolderInfo[]> { this.calls.getFolders++; return this.folders.map((f) => ({ ...f })); }
 
   async getItems(folderId: string | null): Promise<ItemInfo[]> {

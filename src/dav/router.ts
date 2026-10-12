@@ -42,6 +42,7 @@ export class DavRouter {
   readonly locks = new LockManager();
   readonly shadow: ShadowStore;
   private resolver: Resolver;
+  private bigSeen = new Map<string, number>();
   private ctx: DavContext;
 
   constructor(
@@ -124,7 +125,15 @@ export class DavRouter {
     if (depth === '1' && r.kind !== 'item') {
       const entries = await this.resolver.children(r);
       noteReq({ items: entries.length });
-      if (entries.length > WARN_ENTRIES) this.logger.warn(`目录条目过多：${hrefOf(r.segs, true)} 共 ${entries.length} 项`);
+      if (entries.length > WARN_ENTRIES) {
+        // 同一目录在同一份缓存里只提醒一次，否则每次 PROPFIND 都写一行
+        const k = pathKey(r.segs);
+        if (this.bigSeen.get(k) !== this.index.revision) {
+          this.bigSeen.set(k, this.index.revision);
+          if (this.bigSeen.size > 200) this.bigSeen.clear();
+          this.logger.log('info', 'idx', 'large', { path: k, n: entries.length }, `目录条目较多：${hrefOf(r.segs, true)} 共 ${entries.length} 项`);
+        }
+      }
       let n = 0;
       for (const e of entries) {
         await write(res, responseXml(resourceOfEntry(r.segs, e, fallback), request, this.locks, this.ctx.deadProps.get(pathKey([...r.segs, e.name]))));

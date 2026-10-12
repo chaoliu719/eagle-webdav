@@ -83,7 +83,7 @@ export class StatusView {
     for (const id of ['host', 'port', 'user', 'pass', 'rouser', 'ropass', 'cidrs', 'bonjour', 'nosleep']) {
       const el = $(id);
       el.addEventListener('input', () => this.updateDirty());
-      el.addEventListener('change', () => { this.updateHostWarning(); this.updateDirty(); });
+      el.addEventListener('change', () => this.updateDirty());
     }
 
     $('btnStart').addEventListener('click', () => handlers.onStart());
@@ -105,7 +105,6 @@ export class StatusView {
     $<HTMLInputElement>('cidrs').value = s.cidrs.join(', ');
     $<HTMLInputElement>('bonjour').checked = s.bonjour;
     $<HTMLInputElement>('nosleep').checked = s.preventSleep;
-    this.updateHostWarning();
     this.baseline = JSON.stringify(this.readForm());
     this.updateDirty();
   }
@@ -139,11 +138,6 @@ export class StatusView {
     } else {
       this.updateDirty();
     }
-  }
-
-  private updateHostWarning(): void {
-    const v = $<HTMLSelectElement>('host').value;
-    $('hostWarn').textContent = v === '0.0.0.0' ? '将监听所有网卡，请确认密码足够强，且仅在可信局域网中使用。' : '';
   }
 
   setStatus(text: string, bad = false): void {

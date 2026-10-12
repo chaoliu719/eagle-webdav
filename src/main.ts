@@ -84,7 +84,7 @@ function currentSettings(): InitialSettings {
 
 let saving = false;
 
-/** 保存设置并自动启动（运行中则先停止再启动）。校验不通过时不保存、不重启，表单保持原样。 */
+/** 保存设置：运行中则重启以应用，停止着则只保存。校验不通过时不保存、不重启，表单保持原样。 */
 async function save(form: SettingsForm): Promise<void> {
   if (saving) return;
   const fail = (msg: string) => view.setStatus(msg, true);
@@ -101,9 +101,14 @@ async function save(form: SettingsForm): Promise<void> {
       bonjour: form.bonjour, preventSleep: form.preventSleep
     });
     view.applySettings(currentSettings());
-    view.setStatus('已保存，正在重启服务…');
-    if (server.running) await stop();
-    await start();
+    // 保存不改变运行 / 停止：运行中才重启以应用新设置，停止着就只保存，下次启动时生效
+    if (server.running) {
+      view.setStatus('已保存，正在重启服务…');
+      await stop();
+      await start();
+    } else {
+      view.setStatus('已保存，下次启动时生效');
+    }
   } finally {
     saving = false;
     view.setSaving(false);

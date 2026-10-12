@@ -1,5 +1,6 @@
 import * as os from 'os';
-import { summarizeClients } from '../util/clients';
+import { t } from '../i18n';
+import { CLIENT_BROWSER, CLIENT_UNKNOWN, summarizeClients } from '../util/clients';
 import type { RingLogger } from '../util/log';
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
@@ -69,9 +70,9 @@ const modeOf = (host: string): Mode => (LOCAL_HOSTS.includes(host) ? 'local' : '
 
 function ago(ms: number): { text: string; now: boolean } {
   const s = Math.max(0, Math.round(ms / 1000));
-  if (s < 10) return { text: '刚刚', now: true };
-  if (s < 60) return { text: `${s} 秒前`, now: false };
-  return { text: `${Math.round(s / 60)} 分钟前`, now: false };
+  if (s < 10) return { text: t('justNow'), now: true };
+  if (s < 60) return { text: t('secAgo', { n: s }), now: false };
+  return { text: t('minAgo', { n: Math.round(s / 60) }), now: false };
 }
 
 const ICON_MONITOR = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>';
@@ -154,8 +155,8 @@ export class StatusView {
     $('btnCopy').addEventListener('click', () => {
       if (!this.address) return;
       void copyText(this.address);
-      $('copyText').textContent = '已复制';
-      setTimeout(() => { $('copyText').textContent = '复制'; }, 1200);
+      $('copyText').textContent = t('copied');
+      setTimeout(() => { $('copyText').textContent = t('copy'); }, 1200);
     });
   }
 
@@ -190,7 +191,7 @@ export class StatusView {
   private setPassword(isSet: boolean): void {
     const el = $<HTMLInputElement>('pass');
     el.value = isSet ? MASK : '';
-    el.placeholder = isSet ? '' : '未设置';
+    el.placeholder = isSet ? '' : t('passwordUnset');
     el.dataset.isSet = isSet ? '1' : '';
   }
 
@@ -220,7 +221,7 @@ export class StatusView {
     const dirty = JSON.stringify(cur) !== this.baseline;
     $<HTMLButtonElement>('btnSave').disabled = !dirty;
     $<HTMLButtonElement>('btnDiscard').disabled = !dirty;
-    $('dirty').textContent = dirty ? '有未保存的修改' : '';
+    $('dirty').textContent = dirty ? t('dirty') : '';
     const changed: Record<string, boolean> = {
       mode: this.mode !== this.baseMode,
       port: cur.port !== this.baseForm.port,
@@ -251,9 +252,9 @@ export class StatusView {
     const el = document.createElement('div');
     el.className = `toast ${kind}`;
     el.innerHTML = kind === 'error' ? ICON_ERR_SM : kind === 'info' ? ICON_INFO : ICON_OK;
-    const t = document.createElement('span');
-    t.textContent = text;
-    el.append(t);
+    const msg = document.createElement('span');
+    msg.textContent = text;
+    el.append(msg);
     const close = () => {
       el.classList.add('out');
       setTimeout(() => el.remove(), 200);
@@ -262,7 +263,7 @@ export class StatusView {
       const x = document.createElement('button');
       x.type = 'button';
       x.className = 'x';
-      x.setAttribute('aria-label', '关闭');
+      x.setAttribute('aria-label', t('close'));
       x.innerHTML = ICON_CLOSE;
       x.addEventListener('click', close);
       el.append(x);
@@ -310,13 +311,13 @@ export class StatusView {
   }
 
   setLibrary(name: string): void {
-    $('library').textContent = name ? `资源库：${name}` : '资源库：—';
+    $('library').textContent = name ? t('library', { name }) : t('libraryNone');
   }
 
   setRunning(running: boolean): void {
     this.setSwitch('svc', running);
     $('state').classList.toggle('on', running);
-    $('stateText').textContent = running ? '运行中' : '未启动';
+    $('stateText').textContent = running ? t('stateRunning') : t('stateStopped');
     if (!running) this.setAddress(null);
   }
 
@@ -324,7 +325,7 @@ export class StatusView {
   setAddress(url: string | null): void {
     this.address = url;
     const el = $('address');
-    el.textContent = url ?? '启动后显示';
+    el.textContent = url ?? t('addressEmpty');
     el.classList.toggle('empty', !url);
     $<HTMLButtonElement>('btnCopy').disabled = !url;
   }
@@ -373,15 +374,15 @@ export class StatusView {
     const list = summarizeClients(this.logger.recent(), now).slice(0, 8);
     const box = $('devices');
     box.textContent = '';
-    $('devCount').textContent = list.length ? `${list.length} 台` : '';
+    $('devCount').textContent = list.length ? t('deviceCount', { n: list.length }) : '';
     $('devsCard').classList.toggle('is-empty', !list.length);
     if (!list.length) {
       const empty = document.createElement('div');
       empty.className = 'empty-box';
       empty.innerHTML = ICON_MONITOR.replace('width="18" height="18"', 'width="22" height="22"');
-      const t = document.createElement('span');
-      t.textContent = '还没有设备连接';
-      empty.append(t);
+      const msg = document.createElement('span');
+      msg.textContent = t('deviceEmpty');
+      empty.append(msg);
       box.append(empty);
     }
     for (const c of list) {
@@ -396,10 +397,10 @@ export class StatusView {
       info.className = 'grow';
       const nm = document.createElement('div');
       nm.className = 'nm';
-      nm.textContent = c.client;
+      nm.textContent = c.client === CLIENT_UNKNOWN ? t('clientUnknown') : c.client === CLIENT_BROWSER ? t('clientBrowser') : c.client;
       const meta = document.createElement('div');
       meta.className = 'meta';
-      meta.textContent = `${c.ip} · ${c.requests} 次请求`;
+      meta.textContent = `${c.ip} · ${t(c.requests === 1 ? 'deviceReq1' : 'deviceReqs', { n: c.requests })}`;
       info.append(nm, meta);
       const w = document.createElement('div');
       w.className = 'when' + (when.now ? ' now' : '');
@@ -410,7 +411,7 @@ export class StatusView {
 
     const lines = this.logger.recent(60).map((e) =>
       `#${e.n} ${e.ip} ${e.method} ${decodeSafe(e.url)} → ${e.status} ${e.ms}ms${e.depth !== undefined ? ' Depth:' + e.depth : ''}${e.range ? ' Range:' + e.range : ''}${e.contentRange ? ' → ' + e.contentRange : ''}${e.length && !e.contentRange ? ' len:' + e.length : ''}${e.ua ? ' [' + e.ua.slice(0, 40) + ']' : ' [无UA]'}`);
-    $('reqlog').textContent = lines.length ? lines.join('\n') : '（尚无请求）';
+    $('reqlog').textContent = lines.length ? lines.join('\n') : t('noRequests');
     $('msglog').textContent = this.logger.messages().slice(-30).join('\n');
   }
 }

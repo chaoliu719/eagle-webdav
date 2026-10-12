@@ -1,6 +1,9 @@
 import type { RequestEntry } from './log';
 
-/** 把 User-Agent 翻成人话。 */
+export const CLIENT_BROWSER = '浏览器';
+export const CLIENT_UNKNOWN = '未知客户端';
+
+/** 把 User-Agent 翻成人话（浏览器与未知客户端的显示名在窗口里按语言翻译）。 */
 export function friendlyClient(ua: string | undefined): string {
   const u = ua ?? '';
   if (/WebDAVFS|WebDAVLib/i.test(u)) return 'Finder';
@@ -11,8 +14,8 @@ export function friendlyClient(ua: string | undefined): string {
   if (/Cyberduck/i.test(u)) return 'Cyberduck';
   if (/Transmit/i.test(u)) return 'Transmit';
   if (/Documents|Readdle/i.test(u)) return 'Documents';
-  if (/Mozilla/i.test(u)) return '浏览器';
-  return u ? u.split(/[\s/]/)[0].slice(0, 24) : '未知客户端';
+  if (/Mozilla/i.test(u)) return CLIENT_BROWSER;
+  return u ? u.split(/[\s/]/)[0].slice(0, 24) : CLIENT_UNKNOWN;
 }
 
 export interface ClientSummary {

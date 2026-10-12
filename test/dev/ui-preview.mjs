@@ -20,6 +20,12 @@ const stubs = `
   const path = { join: (...p) => p.join('/').replace(/\\/+/g, '/'), dirname: (p) => p.split('/').slice(0, -1).join('/') || '/', basename: (p) => p.split('/').pop(), extname: (p) => { const m = /\\.[^./]+$/.exec(p); return m ? m[0] : ''; }, sep: '/' };
   const os = { release: () => '27.0.0', homedir: () => '/Users/preview', tmpdir: () => '/tmp', hostname: () => 'preview-mac.local', networkInterfaces: () => ({ en0: [{ family: 'IPv4', address: '192.168.0.103', internal: false }], lo0: [{ family: 'IPv4', address: '127.0.0.1', internal: true }] }) };
   const crypto = { randomUUID: () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, () => ((Math.random() * 16) | 0).toString(16)), randomBytes: () => ({ toString: () => '00' }), scryptSync: () => ({ toString: () => '00' }), createHash: () => ({ update() { return this; }, digest: () => new Uint8Array(32) }), timingSafeEqual: () => true };
+  // ?lang=en / zh_TW：模拟 Eagle 的界面语言（eagle.app.locale）
+  const lang = new URLSearchParams(location.search).get('lang');
+  const demo = new URLSearchParams(location.search).get('demo');
+  if (lang || demo) window.eagle = { app: { locale: lang || 'zh_CN' }, library: { info: async () => ({ name: 'Photo Library', path: '/Volumes/Library/Photo Library.library', modificationTime: 1, folders: [] }) } };
+  // ?demo=1：假装有几个客户端连过来，用来截商店封面
+  if (demo) setTimeout(() => { for (let i = 0; i < 14; i++) window.__fakeRequest('WebDAVFS/3.0.0', '192.168.0.12'); window.__fakeRequest('Infuse/7.8', '192.168.0.31', 'GET'); for (let i = 0; i < 6; i++) window.__fakeRequest('rclone/v1.68', '192.168.0.45'); }, 1200);
   window.__listens = [];
   const http = {
     createServer: (handler) => { window.__handler = handler; const s = new Emitter(); s.listen = (...a) => { const cb = a[a.length - 1]; const port = typeof a[0] === 'object' ? a[0].port : a[0]; if ((window.__busyPorts || []).includes(port)) { setTimeout(() => s.emit('error', Object.assign(new Error('listen EADDRINUSE'), { code: 'EADDRINUSE' })), 0); return; } s._port = port; window.__listens.push(a[0]); if (typeof cb === 'function') setTimeout(cb, 0); }; s.close = (cb) => cb && cb(); s.address = () => ({ address: '0.0.0.0', port: s._port }); return s; }

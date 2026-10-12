@@ -4,6 +4,7 @@ import type * as http from 'http';
 import * as path from 'path';
 import { ImportTimeoutError } from '../../eagle/adapter';
 import { send } from '../../http/respond';
+import { t } from '../../i18n';
 import { noteReq } from '../../util/reqctx';
 import { eagleSanitizeName } from '../../vfs/naming';
 import { pathKey, type Resolved } from '../../vfs/resolver';
@@ -94,7 +95,7 @@ export function watchPending(
 ): void {
   const key = 'pending:' + id;
   ctx.logger.log('info', 'imp', 'pending', { id, name }, `「${name}」在等 Eagle 的重复添加确认`);
-  ctx.logger.notice(key, `「${name}」还没有入库：Eagle 弹出了「重复添加提示」，请到 Eagle 里点一下确认。`, { kind: 'warn', title: '有文件在等你确认' });
+  ctx.logger.notice(key, t('pendingMsg', { name }), { kind: 'warn', title: t('pendingTitle') });
   const started = Date.now();
   const timer = setInterval(() => {
     void isListed(ctx, id, folderId).then((listed) => {

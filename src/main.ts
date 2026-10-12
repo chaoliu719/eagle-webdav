@@ -11,6 +11,7 @@ import { DavServer } from './http/server';
 import { LibraryIndex } from './index/libraryIndex';
 import { StatusView, connectUrl, type InitialSettings, type SettingsForm } from './ui/status';
 import { Bonjour } from './util/bonjour';
+import { applyStaticI18n, setLocale, t } from './i18n';
 import { copyText } from './ui/status';
 import { buildDiagnostics } from './util/diagnostics';
 import { FileLog } from './util/fileLog';
@@ -40,14 +41,14 @@ const sleepGuard = new SleepGuard({
   onChange: (active, inflight) => logger.log('info', 'sys', 'sleep', { active, inflight }, active ? '防休眠：已阻止 Mac 休眠' : '防休眠：已放开')
 });
 // 自动发现起不来、或中途退出：开关下方给一行黄字（没有别的副作用，服务本身不受影响）
-const bonjour = new Bonjour({ onFail: () => view.setBonjourNote('自动发现没能启动，其他设备需要手动输入地址。') });
+const bonjour = new Bonjour({ label: () => t('bonjourName'), onFail: () => view.setBonjourNote(t('bonjourFail')) });
 const server = new DavServer({
   getConfig: () => store.get(), logger, metrics, handler: (req, res) => router.handle(req, res),
   activity: { begin: () => sleepGuard.begin(), end: () => sleepGuard.end() }
 });
 // 需要用户注意的事（如 Eagle 在等「重复添加提示」确认）同时用 Eagle 自带的通知提醒一次
 logger.onNotice = (n) => {
-  try { eagle?.notification?.show({ title: n.title ? `WebDAV 共享 · ${n.title}` : 'WebDAV 共享', description: n.message }); } catch { /* ignore */ }
+  try { eagle?.notification?.show({ title: n.title ? `${t('manifest.app.name')} · ${n.title}` : t('manifest.app.name'), description: n.message }); } catch { /* ignore */ }
 };
 const view = new StatusView(logger);
 
@@ -59,7 +60,7 @@ async function start(): Promise<void> {
   const app = adapter.appInfo();
   // build 读不到（0）时无法判断，放行并留下日志
   if (app.build > 0 && app.build < MIN_BUILD) {
-    logger.notice(NOTICE_BUILD, `需要 Eagle 4.0 Build ${MIN_BUILD} 或更高（当前 Build ${app.build}），请升级 Eagle。`, { kind: 'error', title: 'Eagle 版本过低' });
+    logger.notice(NOTICE_BUILD, t('buildLow', { min: MIN_BUILD, cur: app.build }), { kind: 'error', title: t('buildLowTitle') });
     return;
   }
   try {
@@ -84,12 +85,12 @@ async function start(): Promise<void> {
     const busy = err.code === 'EADDRINUSE';
     view.setRunning(false);
     // 启动失败要留着直到解决，并发 Eagle 系统通知：开机自动启动失败时窗口是关着的，用户不会知道
-    logger.notice(NOTICE_START, busy ? `端口 ${port} 已被占用，可能有另一个程序正在使用它。` : err.message, {
+    logger.notice(NOTICE_START, busy ? t('portBusy', { port }) : err.message, {
       kind: 'error',
-      title: '服务没能启动',
+      title: t('startFailTitle'),
       actions: [
-        ...(busy ? [{ label: '改端口', run: () => view.focusField('port') }] : []),
-        { label: '重试', run: () => { void start(); } }
+        ...(busy ? [{ label: t('changePort'), run: () => view.focusField('port') }] : []),
+        { label: t('retry'), run: () => { void start(); } }
       ]
     });
   }
@@ -120,8 +121,8 @@ let saving = false;
  */
 async function save(form: SettingsForm): Promise<void> {
   if (saving) return;
-  if (!form.username) return view.showFieldError('user', '账号不能为空');
-  if (!Number.isInteger(form.port) || form.port < 1024 || form.port > 65535) return view.showFieldError('port', '端口应为 1024 到 65535 之间的数字');
+  if (!form.username) return view.showFieldError('user', t('errUserEmpty'));
+  if (!Number.isInteger(form.port) || form.port < 1024 || form.port > 65535) return view.showFieldError('port', t('errPort'));
 
   saving = true;
   view.setSaving(true);
@@ -142,14 +143,14 @@ async function save(form: SettingsForm): Promise<void> {
     if (server.running) {
       await stop();
       await start();
-      if (server.running) view.toast('已保存，服务已重启');
-      else view.toast('已保存，但服务没能重新启动', 'error');
+      if (server.running) view.toast(t('savedRestarted'));
+      else view.toast(t('savedRestartFailed'), 'error');
     } else {
-      view.toast('已保存，下次启动时生效');
+      view.toast(t('savedNextStart'));
     }
   } catch (e) {
     logger.error('保存设置失败：' + (e as Error).message);
-    view.toast(`没能保存：${(e as Error).message}`, 'error');
+    view.toast(t('saveFailed', { msg: (e as Error).message }), 'error');
   } finally {
     saving = false;
     view.setSaving(false);
@@ -174,11 +175,11 @@ async function copyDiagnostics(): Promise<void> {
       logLines: (fileLog?.tail(200) ?? []).filter((l) => !/"level":"debug"/.test(l)),
       redact: [[lib?.path ?? '', '<资源库>'], [os.homedir(), '~']]
     });
-    if (await copyText(text)) view.toast('诊断信息已复制，可以直接粘贴给开发者');
-    else view.toast('没能复制到剪贴板，请打开日志文件夹取文件', 'error');
+    if (await copyText(text)) view.toast(t('diagCopied'));
+    else view.toast(t('diagCopyFailed'), 'error');
   } catch (e) {
     logger.error('生成诊断信息失败：' + (e as Error).message);
-    view.toast('没能生成诊断信息：' + (e as Error).message, 'error');
+    view.toast(t('diagFailed', { msg: (e as Error).message }), 'error');
   }
 }
 
@@ -189,7 +190,7 @@ function openLogFolder(): void {
     const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
     spawn(cmd, [dir], { stdio: 'ignore', detached: true }).unref();
   } catch (e) {
-    view.toast('没能打开日志文件夹：' + (e as Error).message, 'error');
+    view.toast(t('openLogsFailed', { msg: (e as Error).message }), 'error');
   }
 }
 
@@ -202,11 +203,14 @@ function init(): void {
   store = new ConfigStore(configDir);
   const cfg = store.load();
   const app = adapter.appInfo();
+  // 界面语言跟随 Eagle（eagle.app.locale，要等 onPluginCreate 才读得到），没有的语言退回英文
+  const locale = setLocale(typeof eagle !== 'undefined' ? eagle?.app?.locale : undefined);
+  applyStaticI18n();
   // 文件日志默认开启；级别只在配置文件里改
   fileLog = new FileLog({ dir: path.join(configDir, 'logs') });
   logger.file = fileLog;
   logger.level = cfg.logLevel;
-  logger.log('info', 'svc', 'start', { plugin: __PLUGIN_VERSION__, eagle: app.version, build: app.build, os: `${process.platform} ${os.release()}`, logLevel: cfg.logLevel },
+  logger.log('info', 'svc', 'start', { plugin: __PLUGIN_VERSION__, eagle: app.version, build: app.build, os: `${process.platform} ${os.release()}`, logLevel: cfg.logLevel, locale },
     `WebDAV 共享 ${__PLUGIN_VERSION__} · Eagle ${app.version} Build ${app.build}，配置目录 ${configDir}`);
   try {
     const keys = typeof eagle !== 'undefined' && eagle?.app ? Object.getOwnPropertyNames(Object.getPrototypeOf(eagle.app)).concat(Object.keys(eagle.app)) : [];
@@ -245,7 +249,7 @@ function registerLifecycle(): void {
       const lib = await adapter.libraryInfo();
       view.setLibrary(lib.name);
       logger.log('info', 'svc', 'library', { name: lib.name, ms: Date.now() - t0 }, `资源库切换：${lib.name}`);
-      view.toast(`已切换到资源库「${lib.name}」`, 'info');
+      view.toast(t('libSwitched', { name: lib.name }), 'info');
     } catch (e) {
       logger.error('资源库重载失败：' + (e as Error).message);
     } finally {

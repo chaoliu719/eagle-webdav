@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { currentCtx } from './reqctx';
 
 export interface RequestEntry {
@@ -108,7 +109,7 @@ export class RingLogger implements Logger {
   notice(key: string, message: string, opts: NoticeOptions = {}): void {
     const isNew = !this.notices.has(key);
     const kind = opts.kind ?? 'warn';
-    const actions = opts.actions ?? (kind === 'warn' ? [{ label: '忽略', run: () => this.clearNotice(key) }] : []);
+    const actions = opts.actions ?? (kind === 'warn' ? [{ label: t('ignore'), run: () => this.clearNotice(key) }] : []);
     const n: Notice = { key, message, t: Date.now(), kind, title: opts.title, actions };
     this.notices.set(key, n);
     this.log(kind === 'error' ? 'error' : 'warn', 'notice', key, { title: opts.title, message }, (opts.title ? opts.title + '：' : '') + message);

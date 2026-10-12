@@ -7,6 +7,8 @@ interface EagleLibraryInfo {
 }
 
 interface EagleApp {
+  /** 界面语言，如 zh_CN、en（Eagle 4.0 内置 i18n 用同一个值）。 */
+  locale?: string;
   version?: string;
   build?: number;
   // 未实测：用前先判断是否存在

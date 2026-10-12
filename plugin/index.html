@@ -142,21 +142,21 @@
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><path d="M12 11v4M10 13h4"/></svg>
     </div>
     <div class="grow">
-      <div class="title">WebDAV 共享</div>
-      <div class="sub" id="library">资源库：—</div>
+      <div class="title" data-i18n="manifest.app.name">WebDAV 共享</div>
+      <div class="sub" id="library" data-i18n="libraryNone">资源库：—</div>
     </div>
     <div class="svc">
-      <span class="chip" id="awake" hidden><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg>保持唤醒</span>
-      <span class="state" id="state"><i></i><span id="stateText">未启动</span></span>
-      <button type="button" class="switch lg" id="svc" role="switch" aria-checked="false" aria-label="服务开关"></button>
+      <span class="chip" id="awake" hidden><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg><span data-i18n="awake">保持唤醒</span></span>
+      <span class="state" id="state"><i></i><span id="stateText" data-i18n="stateStopped">未启动</span></span>
+      <button type="button" class="switch lg" id="svc" role="switch" aria-checked="false" aria-label="服务开关" data-i18n-aria="serviceSwitch"></button>
     </div>
   </div>
 
   <div class="addr">
-    <span class="label">连接地址</span>
-    <span class="url empty" id="address">启动后显示</span>
+    <span class="label" data-i18n="addressLabel">连接地址</span>
+    <span class="url empty" id="address" data-i18n="addressEmpty">启动后显示</span>
     <button type="button" class="btn" id="btnCopy" disabled>
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg><span id="copyText">复制</span>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg><span id="copyText" data-i18n="copy">复制</span>
     </button>
   </div>
 </section>
@@ -164,59 +164,59 @@
 <div class="banners" id="notices"></div>
 
 <section class="card">
-  <h2>设置</h2>
+  <h2 data-i18n="settings">设置</h2>
   <div class="form">
     <div class="field" data-key="mode">
-      <span class="name">谁能访问</span>
+      <span class="name" data-i18n="access">谁能访问</span>
       <div class="ctl">
         <div class="seg">
-          <button type="button" id="modeLocal" aria-pressed="false">仅这台 Mac</button>
-          <button type="button" id="modeLan" aria-pressed="true">局域网内的设备</button>
+          <button type="button" id="modeLocal" aria-pressed="false" data-i18n="modeLocal">仅这台 Mac</button>
+          <button type="button" id="modeLan" aria-pressed="true" data-i18n="modeLan">局域网内的设备</button>
         </div>
-        <span class="chg">已修改</span>
+        <span class="chg" data-i18n="changed">已修改</span>
       </div>
     </div>
     <div class="field" data-key="port">
-      <label class="name" for="port">端口</label>
-      <div class="ctlcol"><div class="ctl"><input class="input w-port" id="port" type="number" min="1024" max="65535" aria-describedby="err-port"><span class="chg">已修改</span></div><div class="err" id="err-port" role="alert" hidden></div></div>
+      <label class="name" for="port" data-i18n="port">端口</label>
+      <div class="ctlcol"><div class="ctl"><input class="input w-port" id="port" type="number" min="1024" max="65535" aria-describedby="err-port"><span class="chg" data-i18n="changed">已修改</span></div><div class="err" id="err-port" role="alert" hidden></div></div>
     </div>
     <div class="field" data-key="user">
-      <label class="name" for="user">账号</label>
-      <div class="ctlcol"><div class="ctl"><input class="input w-text" id="user" type="text" autocomplete="off" aria-describedby="err-user"><span class="chg">已修改</span></div><div class="err" id="err-user" role="alert" hidden></div></div>
+      <label class="name" for="user" data-i18n="account">账号</label>
+      <div class="ctlcol"><div class="ctl"><input class="input w-text" id="user" type="text" autocomplete="off" aria-describedby="err-user"><span class="chg" data-i18n="changed">已修改</span></div><div class="err" id="err-user" role="alert" hidden></div></div>
     </div>
     <div class="field" data-key="pass">
-      <label class="name" for="pass">密码</label>
-      <div class="ctl"><input class="input w-text" id="pass" type="password" autocomplete="new-password"><span class="chg">已修改</span></div>
+      <label class="name" for="pass" data-i18n="password">密码</label>
+      <div class="ctl"><input class="input w-text" id="pass" type="password" autocomplete="new-password"><span class="chg" data-i18n="changed">已修改</span></div>
     </div>
     <div class="field">
-      <span class="name">选项</span>
+      <span class="name" data-i18n="options">选项</span>
       <div class="opts">
-        <div><div class="opt"><button type="button" class="switch sm" id="bonjour" role="switch" aria-checked="true" aria-label="自动发现（Bonjour）"></button><span>自动发现（Bonjour）</span></div><div class="note" id="bonjourNote" hidden></div></div>
-        <div class="opt"><button type="button" class="switch sm" id="nosleep" role="switch" aria-checked="true" aria-label="有连接时阻止休眠"></button><span>有连接时阻止休眠</span></div>
+        <div><div class="opt"><button type="button" class="switch sm" id="bonjour" role="switch" aria-checked="true" aria-label="自动发现（Bonjour）" data-i18n-aria="bonjour"></button><span data-i18n="bonjour">自动发现（Bonjour）</span></div><div class="note" id="bonjourNote" hidden></div></div>
+        <div class="opt"><button type="button" class="switch sm" id="nosleep" role="switch" aria-checked="true" aria-label="有连接时阻止休眠" data-i18n-aria="noSleep"></button><span data-i18n="noSleep">有连接时阻止休眠</span></div>
       </div>
     </div>
     <div class="actions">
       <span class="dirty" id="dirty"></span>
-      <button type="button" class="btn lg" id="btnDiscard" disabled>放弃</button>
-      <button type="button" class="btn lg primary" id="btnSave" disabled>保存</button>
+      <button type="button" class="btn lg" id="btnDiscard" disabled data-i18n="discard">放弃</button>
+      <button type="button" class="btn lg primary" id="btnSave" disabled data-i18n="save">保存</button>
     </div>
   </div>
 </section>
 
 <section class="card devs is-empty" id="devsCard">
-  <div class="card-head"><h2>最近连接的设备</h2><span class="faint" id="devCount"></span></div>
+  <div class="card-head"><h2 data-i18n="devices">最近连接的设备</h2><span class="faint" id="devCount"></span></div>
   <div id="devices"></div>
 </section>
 
 <section class="card more">
   <details>
-    <summary>最近请求<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>
-    <pre id="reqlog">（尚无请求）</pre>
+    <summary><span data-i18n="recentRequests">最近请求</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>
+    <pre id="reqlog" data-i18n="noRequests">（尚无请求）</pre>
   </details>
   <details>
-    <summary>日志<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>
+    <summary><span data-i18n="log">日志</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>
     <pre id="msglog"></pre>
-    <div class="logtools"><button type="button" class="btn" id="btnDiag">复制诊断信息</button><button type="button" class="btn ghost" id="btnLogs">打开日志文件夹</button></div>
+    <div class="logtools"><button type="button" class="btn" id="btnDiag" data-i18n="copyDiag">复制诊断信息</button><button type="button" class="btn ghost" id="btnLogs" data-i18n="openLogs">打开日志文件夹</button></div>
   </details>
 </section>
 

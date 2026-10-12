@@ -9,7 +9,7 @@ export class Bonjour {
   name = '';
 
   constructor(private opts: {
-    spawnFn?: Spawn; platform?: string; hostname?: () => string;
+    spawnFn?: Spawn; platform?: string; hostname?: () => string; label?: () => string;
     /** dns-sd 起不来或意外退出时回调（主动 stop() 不算）。 */
     onFail?: () => void;
   } = {}) {}
@@ -27,7 +27,7 @@ export class Bonjour {
     Bonjour.killStale();
     if ((this.opts.platform ?? process.platform) !== 'darwin') return false;
     const host = (this.opts.hostname ?? os.hostname)().split('.')[0] || 'Mac';
-    this.name = `Eagle 素材库 (${host})`;
+    this.name = `${this.opts.label?.() ?? 'Eagle 素材库'} (${host})`;
     const spawnFn: Spawn = this.opts.spawnFn ?? ((c, a) => spawn(c, a, { stdio: 'ignore' }));
     try {
       const child = spawnFn('dns-sd', ['-R', this.name, '_webdav._tcp', 'local', String(port), 'path=/', 'txtvers=1']);

@@ -3,13 +3,16 @@
   "version": "1.0.0",
   "platform": "all",
   "arch": "all",
-  "name": "Eagle WebDAV",
+  "name": "{{manifest.app.name}}",
   "logo": "/logo.png",
   "keywords": [
     "webdav",
+    "共享",
+    "挂载",
     "finder",
+    "infuse",
     "rclone",
-    "infuse"
+    "nas"
   ],
   "devTools": false,
   "main": {
@@ -22,5 +25,11 @@
     "resizable": true,
     "multiple": false,
     "runAfterInstall": true
-  }
+  },
+  "fallbackLanguage": "en",
+  "languages": [
+    "en",
+    "zh_TW",
+    "zh_CN"
+  ]
 }

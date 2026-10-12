@@ -2,6 +2,9 @@
 
 把 Eagle 资源库以 WebDAV 暴露给 Finder、Infuse、rclone 等客户端。形态是 Eagle 后台服务插件（`serviceMode: true`），插件内用 Node `http` 手写最小 WebDAV 服务（Class 1 加假锁实现 Class 2）。
 
+## 命名（用户明确要求，Eagle 内不带 "Eagle"）
+- 清单 `name` 为 `{{manifest.app.name}}`，名字在 `plugin/_locales/{en,zh_CN,zh_TW}.json`：en「WebDAV Share」，中文「WebDAV 共享」；窗口标题与头部、Eagle 系统通知标题（`WebDAV 共享 · …`）同名。Eagle 之外要认得出：Bonjour 服务名 `Eagle 素材库 (主机名)`，Basic 认证 Realm `Eagle Library`（须英文）。仓库名、README 标题、插件 ID `EAGLEWEBDAV01` 不变
+
 ## 技术栈
 - TypeScript，esbuild 打包为 iife，target node16（Eagle 插件运行时 Node 16.17.1 / Electron 22 / Chromium 108）
 - 插件以经典脚本加载，可用 `require`
@@ -54,7 +57,7 @@ PUT 先写影子暂存区，`addFromPath` 加 20s 超时；超时返回 `415` �
 
 ## 体验增强（已真机验证）
 - 状态窗口：自动发现 / 防休眠状态、最近连接的客户端（「连接地址」小节含复制按钮与二维码，按用户要求已删除，依赖 `qrcode-generator` 同时移除；局域网 IP 仍可在「设置 → 监听地址」下拉框里看到）（按 User-Agent 识别 Finder / Infuse / rclone 等）、提示横幅（可「忽略」）。`198.18.0.0/15`（Surge 虚拟网卡）不列入监听地址下拉框
-- Bonjour：Infuse 的发现列表里能看到（真机确认），**Finder 的「网络」不会列出 `_webdav._tcp`（真机确认），Finder 仍须 ⌘K 手输地址**；`dns-sd -R "Eagle WebDAV (主机名)" _webdav._tcp local <端口>`，仅对局域网开放时注册；子进程在页面 `pagehide`、停止、退出时结束，启动时 `pkill -f 'dns-sd -R Eagle WebDAV'` 清理上次遗留
+- Bonjour：Infuse 的发现列表里能看到（真机确认），**Finder 的「网络」不会列出 `_webdav._tcp`（真机确认），Finder 仍须 ⌘K 手输地址**；`dns-sd -R "Eagle 素材库 (主机名)" _webdav._tcp local <端口>`，仅对局域网开放时注册；子进程在页面 `pagehide`、停止、退出时结束，启动时 `pkill -f 'dns-sd -R Eagle '` 清理上次遗留
 - 防休眠：**只有传输类请求（GET / PUT / COPY / MOVE）才计入**，浏览目录与心跳（PROPFIND / OPTIONS / LOCK / HEAD）不计，否则 Finder 挂着空闲的卷（实测 258 个请求多是心跳）会让 Mac 永远睡不着；有传输时起 `caffeinate -i -w <进程号>`，最后一次传输结束后再留 60s 才放开（给播放器请求间隙，防止播到一半睡着），`-w` 保证宿主进程退出后它也退出。窗口里的提示在这 60s 缓冲期内也会显示
 - 重复添加提示：`importAt` 后按**目录列表**确认条目是否出现（`getById` 在弹提示时就已能返回条目，不能用来判断）；没出现就给横幅并用 `eagle.notification.show` 通知，后台每 5s 轮询，入库后自动撤销，10 分钟放弃。实测 Eagle 把多个重复提示合并处理时可能丢掉后面的导入
 

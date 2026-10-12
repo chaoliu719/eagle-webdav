@@ -24,7 +24,7 @@ export interface ListenInfo {
 /** 会读写文件内容的方法。 */
 const TRANSFER_METHODS = new Set(['GET', 'PUT', 'COPY', 'MOVE']);
 
-const REALM = 'Eagle WebDAV';
+const REALM = 'Eagle Library';
 const SERVER_NAME = 'EagleWebdav/0.1';
 
 /**

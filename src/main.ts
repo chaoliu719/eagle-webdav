@@ -33,7 +33,7 @@ const server = new DavServer({
 });
 // 需要用户注意的事（如 Eagle 在等「重复添加提示」确认）同时用 Eagle 自带的通知提醒一次
 logger.onNotice = (n) => {
-  try { eagle?.notification?.show({ title: n.title ? `Eagle WebDAV · ${n.title}` : 'Eagle WebDAV', description: n.message }); } catch { /* ignore */ }
+  try { eagle?.notification?.show({ title: n.title ? `WebDAV 共享 · ${n.title}` : 'WebDAV 共享', description: n.message }); } catch { /* ignore */ }
 };
 const view = new StatusView(logger);
 

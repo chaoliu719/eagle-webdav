@@ -87,8 +87,8 @@ test('Bonjour：注册 _webdav._tcp，停止时结束进程，非 macOS 不注�
     spawnFn: ((cmd: string, a: string[]) => { assert.strictEqual(cmd, 'dns-sd'); args = a; const c = fakeChild().child; kids.push(c); return c; }) as never
   });
   assert.ok(b.start(41600));
-  assert.strictEqual(b.name, 'Eagle WebDAV (My-Mac)');
-  assert.deepStrictEqual(args.slice(0, 5), ['-R', 'Eagle WebDAV (My-Mac)', '_webdav._tcp', 'local', '41600']);
+  assert.strictEqual(b.name, 'Eagle 素材库 (My-Mac)');
+  assert.deepStrictEqual(args.slice(0, 5), ['-R', 'Eagle 素材库 (My-Mac)', '_webdav._tcp', 'local', '41600']);
   assert.ok(b.active);
   b.start(41601); // 重新注册会先结束旧进程
   assert.ok(kids[0].killed && kids.length === 2);

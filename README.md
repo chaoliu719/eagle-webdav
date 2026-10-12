@@ -2,6 +2,8 @@
 
 # Eagle WebDAV
 
+> 在 Eagle 的插件列表和插件窗口里，它叫「WebDAV 共享」（英文 WebDAV Share）。
+
 把 [Eagle](https://eagle.cool) 资源库以 WebDAV 暴露给 Finder、Infuse、rclone 等客户端的后台服务插件。插件内用 Node `http` 手写最小 WebDAV 服务，不依赖第三方 WebDAV 库。
 
 - Eagle 文件夹树就是目录树；另有可写的 `@未分类` 和只读的 `@标签` 虚拟目录

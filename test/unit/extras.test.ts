@@ -20,6 +20,13 @@ import { SleepGuard } from '../../src/util/sleepGuard';
 
 const basic = (s: string) => 'Basic ' + Buffer.from(s).toString('base64');
 
+test('没设管理密码时不要求认证', () => {
+  const a = new Authenticator();
+  const cfg = { username: 'eagle', passwordHash: null, readonlyUsername: 'viewer', readonlyPasswordHash: null };
+  assert.deepStrictEqual(a.login(undefined, '1.1.1.1', cfg), { result: 'ok', role: 'admin' });
+  assert.deepStrictEqual(a.login(basic('x:y'), '1.1.1.1', cfg), { result: 'ok', role: 'admin' });
+});
+
 test('认证区分管理账号与只读账号', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ewdav-x-'));
   const store = new ConfigStore(dir);

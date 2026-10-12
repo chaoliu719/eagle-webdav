@@ -2,7 +2,7 @@ import * as http from 'http';
 import type { Socket } from 'net';
 import type { Config } from '../config/config';
 import type { Logger } from '../util/log';
-import { isAllowedAddress, isLoopbackHost } from './access';
+import { isAllowedAddress } from './access';
 import { Authenticator, type Role } from './auth';
 
 export interface ServerDeps {
@@ -49,9 +49,6 @@ export class DavServer {
   async start(): Promise<ListenInfo> {
     if (this.info) return this.info;
     const cfg = this.deps.getConfig();
-    if (!isLoopbackHost(cfg.host) && !cfg.passwordHash) {
-      throw new Error('监听非本机地址前必须先设置密码');
-    }
     const primary = this.create();
     await new Promise<void>((resolve, reject) => {
       primary.once('error', reject);

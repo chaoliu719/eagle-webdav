@@ -40,9 +40,24 @@ test('配置文件权限为 0600', () => {
   assert.strictEqual(fs.statSync(path.join(dir, 'config.json')).mode & 0o777, 0o600);
 });
 
-test('非本机监听必须先有密码', async () => {
-  const s = new DavServer({ getConfig: () => ({ ...store.get(), host: '0.0.0.0', passwordHash: null }), logger, handler });
-  await assert.rejects(s.start(), /密码/);
+test('没设管理密码：不要求认证，任何访问都是管理账号，也可以监听非本机地址', async () => {
+  const s = new DavServer({
+    getConfig: () => ({ ...store.get(), host: '127.0.0.1', port: 41693, passwordHash: null }), logger,
+    handler: (a, b, role) => { assert.strictEqual(role, 'admin'); return router.handle(a, b, role); }
+  });
+  await s.start();
+  try {
+    const r = await new Promise<number>((resolve, reject) => {
+      http.request({ host: '127.0.0.1', port: 41693, method: 'OPTIONS', path: '/' }, (res) => { res.resume(); resolve(res.statusCode!); }).on('error', reject).end();
+    });
+    assert.strictEqual(r, 200);
+  } finally {
+    await s.stop();
+  }
+  // 监听非本机地址也不再要求先设密码
+  const wide = new DavServer({ getConfig: () => ({ ...store.get(), host: '0.0.0.0', port: 41692, passwordHash: null }), logger, handler });
+  await wide.start();
+  await wide.stop();
 });
 
 test('认证、OPTIONS、501、503', async () => {

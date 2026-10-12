@@ -91,8 +91,6 @@ async function save(form: SettingsForm): Promise<void> {
   if (!form.username) return fail('管理账号的用户名不能为空');
   if (!Number.isInteger(form.port) || form.port < 1 || form.port > 65535) return fail('端口必须是 1 到 65535 之间的数字');
   if (form.readonlyUsername && form.readonlyUsername === form.username) return fail('只读账号的用户名不能和管理账号相同');
-  const loopback = form.host === '127.0.0.1' || form.host === '::1';
-  if (!loopback && !form.password && !store.get().passwordHash) return fail('监听非本机地址前，必须先设置管理账号的密码');
   const bad = form.cidrs.filter((c) => parseCidr(c) === null);
   if (bad.length) return fail(`网段格式不对：${bad.join('、')}（应形如 100.64.0.0/10）`);
 

@@ -28,6 +28,8 @@ export class Authenticator {
 
   /** 通过时返回角色；管理账号与只读账号分别校验。 */
   login(authorization: string | undefined, ip: string, cfg: AuthConfig): { result: AuthResult; role?: Role } {
+    // 没设管理密码：不要求认证，任何访问都当管理账号（产品决定，见 CLAUDE.md）
+    if (!cfg.passwordHash) return { result: 'ok', role: 'admin' };
     const rec = this.failures.get(ip);
     if (rec && rec.bannedUntil > this.now()) return { result: 'banned' };
 

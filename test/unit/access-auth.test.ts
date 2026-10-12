@@ -31,5 +31,6 @@ test('认证与封禁', () => {
   assert.strictEqual(a.check(hdr('u:p'), '2.2.2.2', cfg), 'banned');
   t += 10 * 60 * 1000 + 1;
   assert.strictEqual(a.check(hdr('u:p'), '2.2.2.2', cfg), 'ok');
-  assert.strictEqual(a.check(hdr('u:p'), '3.3.3.3', { username: 'u', passwordHash: null }), 'denied');
+  // 没设管理密码：不要求认证
+  assert.strictEqual(a.check(hdr('u:p'), '3.3.3.3', { username: 'u', passwordHash: null }), 'ok');
 });

@@ -10,7 +10,7 @@
 ## 已确认的产品决策
 - 第一版全功能：OPTIONS、PROPFIND、GET/HEAD、PUT、MKCOL、DELETE、MOVE、COPY、PROPPATCH、LOCK/UNLOCK
 - 条目 DELETE = 把整个条目移入 Eagle 回收站（"一删全删"）；文件夹 DELETE 返回 403
-- 仅局域网，Basic 认证，默认端口 41600
+- 仅局域网（来源地址白名单），Basic 认证，默认端口 41600。**管理密码留空 = 不做认证，任何访问都当管理账号，也允许监听非本机地址**（用户明确要求，不再为用户做额外的安全限制）；设了管理密码才启用认证，只读账号仅在设了密码后才有意义
 - PROPFIND Depth: infinity 返回 403 `propfind-finite-depth`
 
 ## 实测事实（Eagle 4.0.0 Build 23，macOS arm64）

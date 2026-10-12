@@ -43,9 +43,9 @@
 <p class="mut" id="sleep" style="margin-top:0"></p>
 <div id="notices"></div>
 
-<details id="settings">
-  <summary>设置</summary>
-  <div class="grid" style="margin-top:10px">
+<h2>设置</h2>
+<div id="settings">
+  <div class="grid">
     <span>监听地址</span><div><select id="host"></select> <span class="warn" id="hostWarn"></span></div>
     <span>端口</span><div><input type="number" id="port" min="1" max="65535"></div>
     <span>管理账号</span><div class="row" style="margin:0"><input type="text" id="user" size="10"> <input type="password" id="pass" size="16"></div>
@@ -62,7 +62,7 @@
     <button id="btnDiscard" class="sec" disabled>放弃</button>
     <span class="mut" id="dirty"></span>
   </div>
-</details>
+</div>
 
 <h2>最近连接的客户端</h2>
 <table id="clients"><tbody><tr><td class="mut">（尚无连接）</td></tr></tbody></table>

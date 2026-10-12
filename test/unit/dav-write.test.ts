@@ -217,18 +217,21 @@ test('COPY 条目：同名跨目录按引用，改名真复制并带元数据', 
   assert.strictEqual((await req('COPY', '/A', dest('/A2'))).status, 403, '不支持复制文件夹');
 });
 
-test('MOVE 文件夹：改名、移动、后代检查、不能覆盖', async () => {
+test('MOVE 文件夹：只能改名；换父级 403（Eagle 接口会让文件夹树不一致）；后代检查、不能覆盖', async () => {
   assert.strictEqual((await req('MOVE', '/C', dest('/C2'))).status, 201);
   assert.ok(fake.folders.some((f) => f.name === 'C2'));
-  assert.strictEqual((await req('MOVE', '/C2', dest('/B/C2'))).status, 201);
-  assert.strictEqual(fake.folders.find((f) => f.name === 'C2')!.parentId, B.id);
+  const parentBefore = fake.folders.find((f) => f.name === 'C2')!.parentId;
+  const r = await req('MOVE', '/C2', dest('/B/C2'));
+  assert.strictEqual(r.status, 403);
+  assert.ok(r.body.includes('不支持移动文件夹'));
+  assert.strictEqual(fake.folders.find((f) => f.name === 'C2')!.parentId, parentBefore, '父级没变');
   assert.strictEqual((await req('MOVE', '/A', dest('/A/A1/A'))).status, 409);
-  assert.strictEqual((await req('MOVE', '/B/C2', dest('/A'))).status, 403);
-  assert.strictEqual((await req('MOVE', '/B/C2', { ...dest('/A'), Overwrite: 'F' })).status, 412);
-  assert.strictEqual((await req('MOVE', '/B/C2', dest('/@未分类/C2'))).status, 403);
-  assert.strictEqual((await req('MOVE', '/B/C2', dest('/'))).status, 403);
-  assert.strictEqual((await req('MOVE', '/B/C2', dest('/C3'))).status, 201);
-  assert.strictEqual(fake.folders.find((f) => f.name === 'C3')!.parentId, null);
+  assert.strictEqual((await req('MOVE', '/C2', dest('/A'))).status, 403);
+  assert.strictEqual((await req('MOVE', '/C2', { ...dest('/A'), Overwrite: 'F' })).status, 412);
+  assert.strictEqual((await req('MOVE', '/C2', dest('/@未分类/C2'))).status, 403);
+  assert.strictEqual((await req('MOVE', '/C2', dest('/'))).status, 403);
+  assert.strictEqual((await req('MOVE', '/C2', dest('/C3'))).status, 201);
+  assert.ok(fake.folders.some((f) => f.name === 'C3'));
 });
 
 test('PROPPATCH：E 属性、原子性、dead 属性', async () => {

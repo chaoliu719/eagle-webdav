@@ -36,7 +36,7 @@ Eagle 后台服务插件（`serviceMode: true`），插件内用 Node `http` 手
 - PUT：新建 `addFromPath`、覆盖 `replaceFile`；0 字节占位与系统文件（`.DS_Store`、`._*`、`.Spotlight-V100` 等）进影子暂存区，永不入库，重启或切换资源库后丢弃
 - 无扩展名：`addFromPath` 加 20s 超时，超时返回 415 并清理暂存
 - 上传 120s 空闲中止；写入类方法支持 `If-Match` / `If-None-Match`（412）
-- MOVE / COPY：条目改名与归属增量修改；同名跨目录按引用；改名真复制并带 tags / star / annotation / url；文件夹改名与移动；文件夹 COPY 与覆盖文件夹 403
+- MOVE / COPY：条目改名与归属增量修改；同名跨目录按引用；改名真复制并带 tags / star / annotation / url；文件夹只支持改名（换父级 403，见 eagle-api-notes）；文件夹 COPY 与覆盖文件夹 403
 - PROPPATCH：E 命名空间 tags / star / annotation / url，原子性；dead 属性存内存，随 MOVE / COPY 走，DELETE 时清掉；格式错误的 PROPFIND / PROPPATCH 体返回 400
 - LOCK 永不拒绝，对不存在的 URL 建占位，不校验 If 里的令牌（Finder 在插件重启后拿旧令牌不能被拒）；这是有意的假锁
 - 重复添加：`importAt` 后按目录列表确认条目是否出现；没出现就给横幅并用 `eagle.notification.show` 通知，后台每 5s 轮询，入库后自动撤销，10 分钟放弃

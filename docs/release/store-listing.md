@@ -37,7 +37,7 @@ WebDAV Share turns the Eagle library you have open into a WebDAV server. Other a
 Eagle folders appear as folders. Items not in any folder are under `@未分类` (Unfiled), and all items are listed flat under `@全部` (All). New files added in `@全部` are imported as unfiled items.
 
 **What it can change in your library**
-Uploading a file imports it into Eagle. Renaming and moving a file or folder renames and moves the item or folder in Eagle. Deleting a file inside a folder removes it from that folder only when it also belongs to other folders (like Eagle's default choice), otherwise the item moves to the Eagle trash; deleting in `@未分类` or `@全部` always moves the item to the trash; folders cannot be deleted. Copying to another folder makes the item belong to both folders; copying under a new name duplicates the item. Tags, star rating, annotation and URL can be read and written by clients that support WebDAV properties.
+Uploading a file imports it into Eagle. Renaming or moving a file, and renaming a folder, is applied to the item or folder in Eagle (moving a folder to another parent is not supported). Deleting a file inside a folder removes it from that folder only when it also belongs to other folders (like Eagle's default choice), otherwise the item moves to the Eagle trash; deleting in `@未分类` or `@全部` always moves the item to the trash; folders cannot be deleted. Copying to another folder makes the item belong to both folders; copying under a new name duplicates the item. Tags, star rating, annotation and URL can be read and written by clients that support WebDAV properties.
 
 **Things to know**
 - macOS on Apple Silicon only. Requires Eagle 4.0 Build 12 or later. Tested on Eagle 4.0.0 Build 23.
@@ -60,7 +60,7 @@ WebDAV 共享把你当前打开的 Eagle 资源库变成一个 WebDAV 服务。�
 Eagle 的文件夹就是目录。不属于任何文件夹的素材在 `@未分类`，所有素材平铺在 `@全部`；在 `@全部` 里新增的文件会导入为未分类素材。
 
 **它会改动你的资源库**
-上传文件会导入到 Eagle；改名、移动文件或文件夹，会同步改名、移动 Eagle 里的素材或文件夹；在文件夹里删除文件时，如果素材还属于别的文件夹，只是从这个文件夹移除（和 Eagle 默认选项一致），否则整个素材移入 Eagle 回收站；在 `@未分类` 或 `@全部` 里删除，一律整个移入回收站；文件夹不能删除；复制到另一个文件夹是让素材同时属于两个文件夹，改名复制则会复制出一份新素材。支持 WebDAV 属性的客户端还能读写标签、星级、注释和链接。
+上传文件会导入到 Eagle；改名、移动文件，以及文件夹改名，会同步到 Eagle（暂不支持把文件夹移到别的父级）；在文件夹里删除文件时，如果素材还属于别的文件夹，只是从这个文件夹移除（和 Eagle 默认选项一致），否则整个素材移入 Eagle 回收站；在 `@未分类` 或 `@全部` 里删除，一律整个移入回收站；文件夹不能删除；复制到另一个文件夹是让素材同时属于两个文件夹，改名复制则会复制出一份新素材。支持 WebDAV 属性的客户端还能读写标签、星级、注释和链接。
 
 **需要知道**
 - 仅支持 macOS（Apple 芯片）。需要 Eagle 4.0 Build 12 或更高，在 Eagle 4.0.0 Build 23 上验证过。
@@ -83,7 +83,7 @@ WebDAV 共享把你目前開啟的 Eagle 資源庫變成一個 WebDAV 服務。�
 Eagle 的資料夾就是目錄。不屬於任何資料夾的素材在 `@未分类`，所有素材平鋪在 `@全部`；在 `@全部` 裡新增的檔案會匯入為未分類素材。
 
 **它會改動你的資源庫**
-上傳檔案會匯入到 Eagle；改名、移動檔案或資料夾，會同步改名、移動 Eagle 裡的素材或資料夾；在資料夾裡刪除檔案時，如果素材還屬於別的資料夾，只是從這個資料夾移除（和 Eagle 預設選項一致），否則整個素材移到 Eagle 資源回收桶；在 `@未分类` 或 `@全部` 裡刪除，一律整個移到資源回收桶；資料夾不能刪除；複製到另一個資料夾是讓素材同時屬於兩個資料夾，改名複製則會複製出一份新素材。支援 WebDAV 屬性的用戶端還能讀寫標籤、星級、註解和連結。
+上傳檔案會匯入到 Eagle；改名、移動檔案，以及資料夾改名，會同步到 Eagle（暫不支援把資料夾移到別的父層）；在資料夾裡刪除檔案時，如果素材還屬於別的資料夾，只是從這個資料夾移除（和 Eagle 預設選項一致），否則整個素材移到 Eagle 資源回收桶；在 `@未分类` 或 `@全部` 裡刪除，一律整個移到資源回收桶；資料夾不能刪除；複製到另一個資料夾是讓素材同時屬於兩個資料夾，改名複製則會複製出一份新素材。支援 WebDAV 屬性的用戶端還能讀寫標籤、星級、註解和連結。
 
 **需要知道**
 - 僅支援 macOS（Apple 晶片）。需要 Eagle 4.0 Build 12 或更高，在 Eagle 4.0.0 Build 23 上驗證過。

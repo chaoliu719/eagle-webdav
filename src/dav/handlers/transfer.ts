@@ -224,6 +224,9 @@ async function moveFolder(
   if (cleanBase(src.folder.name) !== destName.normalize('NFC')) patch.name = destName;
   if (src.folder.parentId !== newParent) patch.parentId = newParent;
   if (!Object.keys(patch).length) return send(res, 403, {}, '源与目标相同');
+  // 实测（2026-10-12）：改 folder.parent 会让 Eagle 的文件夹树出现重复条目（旧父级的 children 里留着幽灵），
+  // 嵌套文件夹移到根还会无效；接口却照样成功，所以不支持换父级，只支持改名
+  if (patch.parentId !== undefined) return send(res, 403, {}, '不支持移动文件夹到别的父级（Eagle 的接口会让文件夹树不一致），请在 Eagle 里拖动；改名可以');
   await ctx.mutex.run('folder:' + src.folder.id, () => ctx.adapter.updateFolder(src.folder.id, patch));
   ctx.index.invalidate();
   send(res, 201);

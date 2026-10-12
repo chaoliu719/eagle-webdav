@@ -9,6 +9,7 @@
 - Item 实例（属性在原型上，`Object.keys` 为空）：方法 save、replaceFile、moveToTrash、refreshThumbnail、setCustomThumbnail 等；属性 id、name、ext、size、tags、folders、filePath、fileURL、thumbnailPath、modifiedAt、importedAt、isDeleted 等；还有 `palettes`、`comments`、`metadataFilePath`、`noThumbnail`、`noPreview`
 - `eagle.folder`：create、createSubfolder(parentId,{name})、get、getAll、getById 等；Folder 的 `name`、`parent` 可写后 `save()`；`folder.getAll()` 返回的元素带 `children`；Folder 成员有 `createdAt`、`parent`、`children`、`description`、`icon`、`iconColor`。**没有删除文件夹的 API**，测试留下的 `__webdav_test_*` 文件夹要手动删
 - `eagle.library.info()` 返回 folders、modificationTime、path、name 等；没有 `library.modificationTime` / `library.name`
+- **改 `folder.parent`（换父级）不可靠，已禁用（2026-10-12 真机实测）**：对顶层文件夹之间的移动（`x2.parent = x1`、再 `= null`）字段与树都正确；但把**嵌套**文件夹上移一级（`d` 从 `c` 移到 `c` 的父级）后，`d` 的字段父级是对的、新父级的 `children` 里也有 `d`，**旧父级 `c` 的 `children` 里仍留着 `d`**，同一个 id 在树里出现两次（Eagle 侧边栏也还显示在旧位置）；嵌套文件夹同时改名 + `parent = null` 则改名生效、移到根无效；接口全程都不报错。因此 MOVE 文件夹只支持改名，换父级返回 403
 - `eagle.tag.get()` 取标签名（元素为带原型 getter 的对象，取 `.name`）。`@标签` 视图删除后插件不再用它，留作记录
 - `eagle.app.userDataPath` 存在（`~/Library/Application Support/Eagle`，配置放其下 `eagle-webdav/`）；缺失时回退到 `~/.eagle-webdav`
 - 脚本加载瞬间 `eagle.app` 的 version、build、userDataPath 读不到（曾显示 Build 0），初始化要等 `onPluginCreate`；build 读不到时不拦截启动

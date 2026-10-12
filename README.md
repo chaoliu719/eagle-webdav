@@ -11,7 +11,7 @@
 - 写：PUT、MKCOL、DELETE（进回收站）、MOVE、COPY、PROPPATCH、LOCK / UNLOCK
 - 仅局域网，Basic 认证，默认端口 41600
 
-已在 Eagle 4.0.0 Build 23（macOS arm64）上验证。使用说明见 [docs/usage-guide.md](docs/usage-guide.md)。
+已在 Eagle 4.0.0 Build 23（macOS arm64）上验证。使用说明见 [docs/user/getting-started.md](docs/user/getting-started.md)。
 
 ## 安装
 
@@ -43,7 +43,7 @@ npm run build
 
 目录：`src/config`（配置与 scrypt）、`src/http`（服务、认证、来源过滤）、`src/dav`（路由与各方法）、`src/vfs`（命名、路径解析、影子暂存区）、`src/index`（缓存）、`src/eagle`（适配层，只有 `realAdapter.ts` 碰全局 `eagle`）。
 
-Eagle Plugin API 的实测行为和踩过的坑记录在 [CLAUDE.md](CLAUDE.md)，设计文档见 [docs/design.md](docs/design.md)（以 CLAUDE.md 的实测为准）。
+Eagle Plugin API 的实测行为和踩过的坑记录在 [CLAUDE.md](CLAUDE.md)，设计文档见 [docs/archive/design.md](docs/archive/design.md)（以 CLAUDE.md 的实测为准）。
 
 ## 已知限制
 

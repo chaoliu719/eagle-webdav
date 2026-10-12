@@ -8,7 +8,7 @@
 ## 多语言与上架（用户确认要上插件中心）
 - 界面三语：简中 / 繁中 / 英文，**字典就是 `plugin/_locales/{zh_CN,zh_TW,en}.json`**（`manifest.app.name` + `ui.*`），同时被 Eagle 读（清单名称）和被 esbuild 打进 `plugin.js`（`src/i18n.ts`，不依赖 Eagle 的 i18next）。语言取自 `eagle.app.locale`（官方 i18n 文档里的写法，要等 `onPluginCreate`；**真机未实测该值的格式**），`zh_TW/HK` → 繁中、其他 `zh*` → 简中、其余一律英文（与 `fallbackLanguage: en` 一致）。HTML 里静态文字用 `data-i18n` / `data-i18n-aria` 属性，初始化时 `applyStaticI18n()` 替换；动态文字用 `t(key, vars)`。新增文案必须三种语言同步，`test/unit/i18n.test.ts` 检查键与 `{{变量}}` 一致。日志文件和窗口里的日志行、诊断信息仍是中文（面向开发者）；目录名 `@未分类` `@标签` `@全部` 不翻译；Bonjour 名称随语言（`Eagle 素材库` / `Eagle Library` / `Eagle 素材庫`），认证 Realm 固定 `Eagle Library`
 - 清单 `platform: mac`、`arch: arm`（只在 macOS Apple 芯片上验证过；官方允许值 platform `all|mac|win`、arch `all|arm|x64`）
-- 官方审核要点（读自 developer.eagle.cool/plugin-api 的 publishing 与 plugin-review）：必须用 Eagle「打包插件」导出（不能用 `npm run package` 的产物上传）、`devTools` 不能为 true、包里不能有开发文件 / `.DS_Store` / 密钥；商店文案名称 ≤ 30 字符且 ≤ 6 个词，简短描述英文 ≤ 200、简中 ≤ 100，每种提交的语言都要完整；子进程、本地监听、明文 HTTP、改动资源库都要在介绍里披露；要有支持联系方式；开发者必须能解释提交的代码（AI 辅助开发不免责）。全部材料在 `docs/store-listing.md`，封面在 `docs/store/`
+- 官方审核要点（读自 developer.eagle.cool/plugin-api 的 publishing 与 plugin-review）：必须用 Eagle「打包插件」导出（不能用 `npm run package` 的产物上传）、`devTools` 不能为 true、包里不能有开发文件 / `.DS_Store` / 密钥；商店文案名称 ≤ 30 字符且 ≤ 6 个词，简短描述英文 ≤ 200、简中 ≤ 100，每种提交的语言都要完整；子进程、本地监听、明文 HTTP、改动资源库都要在介绍里披露；要有支持联系方式；开发者必须能解释提交的代码（AI 辅助开发不免责）。全部材料在 `docs/release/store-listing.md`，封面在 `docs/release/store/`
 - 预览脚本：`?lang=en` / `zh_TW` 模拟界面语言，`?demo=1` 模拟几个客户端连接并带库名（截封面用）
 
 ## 技术栈

@@ -5,7 +5,8 @@
 提交前必须做的事（官方清单）：
 1. 用 Eagle 自己的「打包插件」导出 `.eagleplugin`（插件面板里右键该插件 → 打包插件），不要上传 `npm run package` 的产物。
 2. 卸载开发模式加载的同 ID 插件，安装刚打好的包，确认能启动、主要功能可用，并解压检查里面只有运行需要的文件。
-3. 填写支持联系方式（邮箱，或公开的网站 / 帮助页链接）。**GitHub 仓库目前是私有的，只有改成公开才能当支持链接。**
+3. 填写支持联系方式：GitHub 仓库已公开，用下面的仓库链接。
+4. 2026-10-12 已用 Eagle「打包插件」导出（`WebDAV 共享.eagleplugin`，64KB），解压核对：与仓库 `plugin/` 完全一致，只有 `manifest.json`、`index.html`、`logo.png`、`js/plugin.js` 和 `_locales/` 下三个文件，没有隐藏文件和开发文件，`devTools` 为 false。
 
 ## 名称
 
@@ -113,7 +114,7 @@ Eagle 的資料夾就是目錄。不屬於任何資料夾的素材在 `@未分�
 
 ## 支持联系方式
 
-[由你填写：邮箱，或公开的网站 / 帮助页链接]
+https://github.com/chaoliu719/eagle-webdav （公开仓库，Issues 里提问；使用说明在仓库 `docs/user/`）
 
 ## 图标与封面
 

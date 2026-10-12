@@ -261,6 +261,7 @@ function registerLifecycle(): void {
 
 // 页面被重载或关闭时，立刻放开子进程（dns-sd、caffeinate）
 window.addEventListener('pagehide', () => {
+  logger.log('info', 'svc', 'exit', {}, '插件页面关闭或重载');
   bonjour.stop();
   sleepGuard.release();
   fileLog?.flush();

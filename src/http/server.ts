@@ -152,7 +152,11 @@ export class DavServer {
     const bulk = (method === 'GET' || method === 'PUT') && bytes >= BULK_BYTES;
     const mbps = bulk && ms > 0 ? Math.round((bytes / 1048576 / (ms / 1000)) * 10) / 10 : undefined;
     if (status >= 500 && !ctx.errored) log.log('error', 'req', 'error', { ...base, ip, client });
-    else if (WRITE_METHODS.has(method) && status < 400) {
+    else if (ctx.fields.shadow && status < 400) {
+      // 系统文件（.DS_Store、._*）与 Finder 的 0 字节占位只进暂存区，不是真正入库，降到 debug 免得刷屏
+      const { shadow: _s, ...rest } = base as Record<string, unknown>;
+      log.log('debug', 'req', 'put.shadow', { ...rest, client });
+    } else if (WRITE_METHODS.has(method) && status < 400) {
       const ev = method === 'PUT' ? (status === 201 ? 'put.create' : 'put.replace') : method.toLowerCase();
       log.log('info', 'req', ev, { ...base, bytes: reqBytes || undefined, mbps, client }, `${ev} ${path} ${status} ${ms}ms`);
     } else if (status >= 400 && status !== 401) log.log('debug', 'req', 'deny', { ...base, client });

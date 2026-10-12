@@ -4,6 +4,7 @@ import * as path from 'path';
 import { Transform } from 'stream';
 import { pipeline } from 'stream/promises';
 import { send } from '../../http/respond';
+import { noteReq } from '../../util/reqctx';
 import { isSystemName } from '../../vfs/shadow';
 import { isCollection, isReadOnlyView, pathKey } from '../../vfs/resolver';
 import { writePreconditionFailed } from '../conditional';
@@ -66,6 +67,7 @@ export async function handlePut(ctx: DavContext, req: http.IncomingMessage, res:
       const dest = ctx.shadow.allocPath();
       if (size > 0) await fs.promises.rename(tmp, dest).catch(() => fs.promises.copyFile(tmp, dest));
       ctx.shadow.putFile(key, name, size > 0 ? dest : null, size);
+      noteReq({ shadow: true });
       return send(res, existed ? 204 : 201);
     }
 
@@ -76,6 +78,7 @@ export async function handlePut(ctx: DavContext, req: http.IncomingMessage, res:
     // 0 字节且目标不存在：Finder 的占位写入，只登记，等后续带内容的 PUT
     if (size === 0 && (!target || target.kind === 'shadow')) {
       ctx.shadow.putFile(key, name, null, 0);
+      noteReq({ shadow: true });
       return send(res, target ? 204 : 201);
     }
 

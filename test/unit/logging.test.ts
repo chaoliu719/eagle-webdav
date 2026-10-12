@@ -158,6 +158,11 @@ test('服务端：启动、写操作、拒绝、新客户端都有结构化日�
   assert.strictEqual(recs.filter((r) => r.cat === 'cli' && r.ev === 'new').length, 1);
   assert.strictEqual(await req('PUT', '/图/new.png', {}, 'NEW2'), 204);
   assert.ok(recs.some((r) => r.ev === 'put.replace'));
+  // 系统文件只进暂存区：不记 info 的 put.create，只有 debug 的 put.shadow
+  const before = recs.filter((r) => r.ev === 'put.create').length;
+  assert.strictEqual(await req('PUT', '/图/.DS_Store', {}, 'x'), 201);
+  assert.strictEqual(recs.filter((r) => r.ev === 'put.create').length, before);
+  assert.ok(recs.some((r) => r.ev === 'put.shadow' && r.level === 'debug' && r.shadow === undefined));
   assert.strictEqual(await req('PUT', '/图/noext', {}, 'x'), 415);
   assert.ok(recs.some((r) => r.cat === 'req' && r.ev === 'deny' && r.status === 415));
   // 同一请求里的 eagle.call 日志与该请求的 rid 一致

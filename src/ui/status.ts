@@ -74,6 +74,16 @@ const ICON_MONITOR = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none
 const ICON_TV = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M9 21h6M12 17v4"/><path d="M10 9.5v4l3.5-2z"/></svg>';
 const ICON_TERMINAL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M12 15h5"/></svg>';
 
+const ICON_ERROR = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.2v.1"/></svg>';
+const ICON_WARN = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2L12 3z"/><path d="M12 10v5M12 18v.1"/></svg>';
+const ICON_OK = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+const ICON_ERR_SM = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.2v.1"/></svg>';
+const ICON_INFO = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.9v.1"/></svg>';
+const ICON_CLOSE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
+export type ToastKind = 'ok' | 'error' | 'info';
+const MAX_TOASTS = 3;
+
 function iconFor(client: string): { svg: string; alt: boolean } {
   if (client === 'Infuse') return { svg: ICON_TV, alt: true };
   if (['rclone', 'curl', 'ffmpeg'].includes(client)) return { svg: ICON_TERMINAL, alt: false };
@@ -114,7 +124,10 @@ export class StatusView {
     this.applySettings(handlers.getSettings());
 
     for (const id of ['port', 'user', 'pass']) {
-      $(id).addEventListener('input', () => this.updateDirty());
+      $(id).addEventListener('input', () => {
+        if (id !== 'pass') this.clearFieldError(id);
+        this.updateDirty();
+      });
     }
     $('modeLocal').addEventListener('click', () => this.setMode('local'));
     $('modeLan').addEventListener('click', () => this.setMode('lan'));
@@ -148,6 +161,7 @@ export class StatusView {
 
   /** 用已保存的配置填充表单（保存成功后、或点「放弃」时），并清空密码框。 */
   applySettings(s: InitialSettings): void {
+    for (const k of ['port', 'user']) this.clearFieldError(k);
     this.baseMode = modeOf(s.host);
     this.mode = this.baseMode;
     $('modeLocal').setAttribute('aria-pressed', String(this.mode === 'local'));
@@ -217,12 +231,72 @@ export class StatusView {
     }
   }
 
-  /** 服务状态之外的提示：出错（红）或正在做的事（灰）；空串表示隐藏。 */
-  setStatus(text: string, bad = false): void {
-    const el = $('status');
-    el.textContent = text;
+  /**
+   * Toast：操作的结果，说完就过去。成功 / 提示 3 秒消失，错误 6 秒且可点击关闭；最多同时 3 条。
+   * 需要用户处理的问题不要用它，走 logger.notice（横幅 + 系统通知）。
+   */
+  toast(text: string, kind: ToastKind = 'ok'): void {
+    const box = $('toasts');
+    while (box.children.length >= MAX_TOASTS) box.firstElementChild?.remove();
+    const el = document.createElement('div');
+    el.className = `toast ${kind}`;
+    el.innerHTML = kind === 'error' ? ICON_ERR_SM : kind === 'info' ? ICON_INFO : ICON_OK;
+    const t = document.createElement('span');
+    t.textContent = text;
+    el.append(t);
+    const close = () => {
+      el.classList.add('out');
+      setTimeout(() => el.remove(), 200);
+    };
+    if (kind === 'error') {
+      const x = document.createElement('button');
+      x.type = 'button';
+      x.className = 'x';
+      x.setAttribute('aria-label', '关闭');
+      x.innerHTML = ICON_CLOSE;
+      x.addEventListener('click', close);
+      el.append(x);
+    }
+    box.append(el);
+    setTimeout(close, kind === 'error' ? 6000 : 3000);
+  }
+
+  /** 行内错误：红字贴在字段下面、字段变红框，并聚焦；改动该字段后自动消失。 */
+  showFieldError(key: 'port' | 'user', message: string): void {
+    const input = $<HTMLInputElement>(key);
+    const err = $(`err-${key}`);
+    err.textContent = message;
+    err.hidden = false;
+    input.classList.add('invalid');
+    input.setAttribute('aria-invalid', 'true');
+    input.focus();
+    input.select();
+  }
+
+  private clearFieldError(key: string): void {
+    const input = $<HTMLInputElement>(key);
+    input.classList.remove('invalid');
+    input.removeAttribute('aria-invalid');
+    $(`err-${key}`).hidden = true;
+  }
+
+  focusField(key: 'port' | 'user'): void {
+    const el = $<HTMLInputElement>(key);
+    el.scrollIntoView({ block: 'center' });
+    el.focus();
+    el.select();
+  }
+
+  /** 自动发现没能启动：开关下方一行黄字；null 表示正常。 */
+  setBonjourNote(text: string | null): void {
+    const el = $('bonjourNote');
+    el.textContent = text ?? '';
     el.hidden = !text;
-    el.classList.toggle('bad', bad);
+  }
+
+  /** 「保持唤醒」标签：正在阻止 Mac 休眠时出现。 */
+  setAwake(active: boolean): void {
+    $('awake').hidden = !active;
   }
 
   setLibrary(name: string): void {
@@ -245,12 +319,6 @@ export class StatusView {
     $<HTMLButtonElement>('btnCopy').disabled = !url;
   }
 
-  setSleepState(active: boolean, enabled: boolean): void {
-    const el = $('sleep');
-    el.textContent = enabled && active ? '正在阻止 Mac 休眠（有文件传输）。' : '';
-    el.hidden = !el.textContent;
-  }
-
   renderLog(force: boolean): void {
     const now = Date.now();
     if (!force && now - this.lastRender < 400) return;
@@ -260,15 +328,35 @@ export class StatusView {
     notices.textContent = '';
     for (const n of this.logger.activeNotices()) {
       const d = document.createElement('div');
-      d.className = 'notice';
-      const msg = document.createElement('span');
+      d.className = `banner ${n.kind}`;
+      d.setAttribute('role', 'alert');
+      d.innerHTML = n.kind === 'error' ? ICON_ERROR : ICON_WARN;
+      const body = document.createElement('div');
+      body.className = 'grow';
+      if (n.title) {
+        const t = document.createElement('div');
+        t.className = 't';
+        t.textContent = n.title;
+        body.append(t);
+      }
+      const msg = document.createElement('div');
+      msg.className = n.title ? 'd' : 't';
       msg.textContent = n.message;
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'btn';
-      btn.textContent = '忽略';
-      btn.addEventListener('click', () => { this.logger.clearNotice(n.key); this.renderLog(true); });
-      d.append(msg, btn);
+      body.append(msg);
+      d.append(body);
+      if (n.actions.length) {
+        const acts = document.createElement('div');
+        acts.className = 'acts';
+        n.actions.forEach((a, idx) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'btn' + (n.kind === 'error' && idx === n.actions.length - 1 ? ' primary' : '');
+          b.textContent = a.label;
+          b.addEventListener('click', () => { a.run(); this.renderLog(true); });
+          acts.append(b);
+        });
+        d.append(acts);
+      }
       notices.append(d);
     }
 

@@ -19,12 +19,32 @@ export interface Logger {
   warn(msg: string): void;
   error(msg: string): void;
   request(entry: RequestEntry): void;
-  /** 需要用户注意的事（如 Eagle 在等「重复添加提示」确认）：key 相同的会覆盖，clearNotice 撤销。 */
-  notice(key: string, message: string): void;
+  /**
+   * 需要用户处理的问题（持续到解决，在窗口里是横幅，同时发 Eagle 系统通知）：
+   * key 相同的会覆盖，clearNotice 撤销。一次性的操作结果不走这里，用窗口里的 toast。
+   */
+  notice(key: string, message: string, opts?: NoticeOptions): void;
   clearNotice(key: string): void;
 }
 
-export interface Notice { key: string; message: string; t: number }
+export interface NoticeAction { label: string; run(): void }
+
+export interface NoticeOptions {
+  /** error = 红色（出了故障）；warn = 黄色（在等你处理）。默认 warn。 */
+  kind?: 'error' | 'warn';
+  title?: string;
+  /** 横幅上的按钮。warn 没给时默认一个「忽略」；error 没给则没有按钮（自己恢复）。 */
+  actions?: NoticeAction[];
+}
+
+export interface Notice {
+  key: string;
+  message: string;
+  t: number;
+  kind: 'error' | 'warn';
+  title?: string;
+  actions: NoticeAction[];
+}
 
 const RING_SIZE = 500;
 
@@ -51,11 +71,13 @@ export class RingLogger implements Logger {
     this.listeners.forEach((fn) => fn());
   }
 
-  notice(key: string, message: string): void {
+  notice(key: string, message: string, opts: NoticeOptions = {}): void {
     const isNew = !this.notices.has(key);
-    const n = { key, message, t: Date.now() };
+    const kind = opts.kind ?? 'warn';
+    const actions = opts.actions ?? (kind === 'warn' ? [{ label: '忽略', run: () => this.clearNotice(key) }] : []);
+    const n: Notice = { key, message, t: Date.now(), kind, title: opts.title, actions };
     this.notices.set(key, n);
-    this.out('warn', message);
+    this.out(kind === 'error' ? 'error' : 'warn', (opts.title ? opts.title + '：' : '') + message);
     if (isNew) { try { this.onNotice?.(n); } catch { /* ignore */ } }
   }
 

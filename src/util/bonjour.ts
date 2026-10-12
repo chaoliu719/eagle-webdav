@@ -8,7 +8,11 @@ export class Bonjour {
   private child: ChildProcess | null = null;
   name = '';
 
-  constructor(private opts: { spawnFn?: Spawn; platform?: string; hostname?: () => string } = {}) {}
+  constructor(private opts: {
+    spawnFn?: Spawn; platform?: string; hostname?: () => string;
+    /** dns-sd 起不来或意外退出时回调（主动 stop() 不算）。 */
+    onFail?: () => void;
+  } = {}) {}
 
   get active(): boolean { return this.child !== null; }
 
@@ -27,12 +31,18 @@ export class Bonjour {
     const spawnFn: Spawn = this.opts.spawnFn ?? ((c, a) => spawn(c, a, { stdio: 'ignore' }));
     try {
       const child = spawnFn('dns-sd', ['-R', this.name, '_webdav._tcp', 'local', String(port), 'path=/', 'txtvers=1']);
-      child.on('exit', () => { if (this.child === child) this.child = null; });
-      child.on('error', () => { if (this.child === child) this.child = null; });
+      const dropped = () => {
+        if (this.child !== child) return; // 主动 stop() 过的，不算失败
+        this.child = null;
+        try { this.opts.onFail?.(); } catch { /* ignore */ }
+      };
+      child.on('exit', dropped);
+      child.on('error', dropped);
       this.child = child;
       return true;
     } catch {
       this.child = null;
+      try { this.opts.onFail?.(); } catch { /* ignore */ }
       return false;
     }
   }

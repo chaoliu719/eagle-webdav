@@ -89,6 +89,46 @@ test('Bonjour：注册 _webdav._tcp，停止时结束进程，非 macOS 不注�
   assert.ok(!n.start(1));
 });
 
+test('Bonjour：起不来或意外退出才回调 onFail，主动 stop 不算', () => {
+  let fails = 0;
+  const kids: FakeChild[] = [];
+  const b = new Bonjour({
+    platform: 'darwin', hostname: () => 'Mac.local', onFail: () => { fails++; },
+    spawnFn: (() => { const c = new FakeChild(); kids.push(c); return c; }) as never
+  });
+  assert.ok(b.start(41600));
+  b.stop();
+  assert.strictEqual(fails, 0, '主动 stop 不算失败');
+  assert.ok(b.start(41600));
+  kids[1].emit('exit'); // dns-sd 中途退出
+  assert.strictEqual(fails, 1);
+  assert.ok(!b.active);
+  const broken = new Bonjour({ platform: 'darwin', onFail: () => { fails++; }, spawnFn: (() => { throw new Error('找不到 dns-sd'); }) as never });
+  assert.ok(!broken.start(1));
+  assert.strictEqual(fails, 2, '启动即抛错也算失败');
+  const other = new Bonjour({ platform: 'linux', onFail: () => { fails++; } });
+  assert.ok(!other.start(1));
+  assert.strictEqual(fails, 2, '非 macOS 本来就不支持，不算失败');
+});
+
+test('提示（横幅）：类型、标题、默认按钮、覆盖与撤销', () => {
+  const logger = new RingLogger();
+  const seen: string[] = [];
+  logger.onNotice = (n) => seen.push(n.key);
+  logger.notice('w', '等你确认', { title: '有文件在等你确认' });
+  logger.notice('e', '端口被占用', { kind: 'error', title: '服务没能启动', actions: [{ label: '重试', run: () => undefined }] });
+  logger.notice('e2', '版本过低', { kind: 'error' });
+  const list = logger.activeNotices();
+  assert.deepStrictEqual(list.map((n) => [n.key, n.kind, n.actions.map((a) => a.label)]).sort(), [['e', 'error', ['重试']], ['e2', 'error', []], ['w', 'warn', ['忽略']]]);
+  logger.notice('e', '仍然被占用', { kind: 'error', title: '服务没能启动' }); // 同一个 key 覆盖，不重复通知
+  assert.deepStrictEqual(seen, ['w', 'e', 'e2']);
+  assert.strictEqual(logger.activeNotices().find((n) => n.key === 'e')?.message, '仍然被占用');
+  logger.activeNotices().find((n) => n.key === 'w')!.actions[0].run(); // 默认的「忽略」会撤销
+  assert.ok(!logger.activeNotices().some((n) => n.key === 'w'));
+  logger.clearNotice('e');
+  assert.deepStrictEqual(logger.activeNotices().map((n) => n.key), ['e2']);
+});
+
 test('客户端识别与汇总', () => {
   assert.strictEqual(friendlyClient('WebDAVFS/3.0.0 (03008000) Darwin/25.0.0'), 'Finder');
   assert.strictEqual(friendlyClient('Infuse-Direct/8.3'), 'Infuse');

@@ -86,7 +86,7 @@ export function watchPending(
   ctx: DavContext, id: string, name: string, folderId: string | null, pollMs = PENDING_POLL_MS, giveUpMs = PENDING_GIVE_UP_MS
 ): void {
   const key = 'pending:' + id;
-  ctx.logger.notice(key, `「${name}」还没有入库：Eagle 可能弹出了「重复添加提示」，请到 Eagle 里点一下确认`);
+  ctx.logger.notice(key, `「${name}」还没有入库：Eagle 弹出了「重复添加提示」，请到 Eagle 里点一下确认。`, { kind: 'warn', title: '有文件在等你确认' });
   const started = Date.now();
   const timer = setInterval(() => {
     void isListed(ctx, id, folderId).then((listed) => {

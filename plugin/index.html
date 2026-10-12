@@ -9,13 +9,17 @@
     color-scheme: light dark;
     --bg:#F3F4F7; --card:#FFFFFF; --line:#E4E6EC; --line-soft:#ECEEF3; --field:#FFFFFF; --field-line:#DADDE5; --well:#F3F4F7; --seg:#ECEEF3; --seg-on:#FFFFFF;
     --fg:#16181D; --mut:#6A6F7E; --faint:#8A8F9E; --acc:#2563EB; --acc-weak:#E8EFFE; --acc-off:#C6D4F7; --ok:#1F9D55; --ok-text:#167A42; --off:#C9CDD8; --dot-off:#B5B9C6;
-    --warn:#B26A00; --warn-bg:#FFF4DC; --bad:#C62828; --purple:#7C3AED; --purple-weak:#F1E9FB; --shadow:0 1px 2px rgba(20,24,40,.14);
+    --warn:#B26A00; --warn-bg:#FFF4DC; --warn-line:#F0DDAA; --warn-title:#8A5A00; --warn-text:#9A6200; --bad:#C62828; --bad-bg:#FDECEC; --bad-line:#F3C4C4; --bad-title:#9B1C1C; --bad-text:#B04040;
+    --purple:#7C3AED; --purple-weak:#F1E9FB; --shadow:0 1px 2px rgba(20,24,40,.14);
+    --toast-bg:#1F2229; --toast-fg:#FFFFFF; --toast-shadow:0 8px 24px rgba(20,24,40,.28); --toast-ok:#4ED58A; --toast-bad:#FF8A80; --toast-mut:#B7BCC9;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg:#151619; --card:#1F2126; --line:#2C2F36; --line-soft:#2C2F36; --field:#2A2D34; --field-line:#3A3E47; --well:#2A2D34; --seg:#2A2D34; --seg-on:#43474F;
       --fg:#F1F2F5; --mut:#9AA0AE; --faint:#7E8494; --acc:#4C80EA; --acc-weak:#22304F; --acc-off:#33466F; --ok:#2FB66B; --ok-text:#4ED58A; --off:#454952; --dot-off:#6B7080;
-      --warn:#F5B54A; --warn-bg:#3A3018; --bad:#FF7B72; --purple:#B493F5; --purple-weak:#2F2547; --shadow:0 1px 2px rgba(0,0,0,.4);
+      --warn:#F5B54A; --warn-bg:#3A3018; --warn-line:#5A4A20; --warn-title:#F5C873; --warn-text:#D6B068; --bad:#FF7B72; --bad-bg:#3A1E1F; --bad-line:#5C2B2D; --bad-title:#FF9A92; --bad-text:#E39891;
+      --purple:#B493F5; --purple-weak:#2F2547; --shadow:0 1px 2px rgba(0,0,0,.4);
+      --toast-bg:#ECEEF3; --toast-fg:#16181D; --toast-shadow:0 8px 24px rgba(0,0,0,.5); --toast-ok:#1F9D55; --toast-bad:#C62828; --toast-mut:#5B6070;
     }
   }
   * { box-sizing: border-box; }
@@ -51,8 +55,7 @@
   .addr .label { color:var(--mut); font-size:12.5px; flex-shrink:0; }
   .addr .url { flex-grow:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; user-select:all; font:500 14px ui-monospace, "SF Mono", Menlo, monospace; }
   .addr .url.empty { color:var(--faint); font-family:inherit; font-weight:400; user-select:none; }
-  .line { font-size:12.5px; color:var(--mut); margin:-6px 0 0; }
-  .line.bad { color:var(--bad); }
+  .chip { display:inline-flex; align-items:center; gap:5px; height:22px; padding:0 9px; border-radius:11px; background:var(--acc-weak); color:var(--acc); font-size:12px; font-weight:600; }
 
   /* 按钮 */
   .btn { display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 12px; border-radius:8px; border:1px solid var(--field-line); background:var(--field); color:var(--fg); font-size:13px; font-weight:500; cursor:pointer; }
@@ -61,8 +64,35 @@
   .btn.primary { border:0; background:var(--acc); color:#fff; font-weight:600; }
   .btn.primary:disabled { background:var(--acc-off); color:#fff; opacity:1; }
 
-  /* 提示横幅 */
-  .notice { display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--warn-bg); color:var(--warn); border-radius:12px; padding:10px 14px; }
+  /* 横幅：要你处理的问题，持续到解决 */
+  .banners { display:flex; flex-direction:column; gap:12px; }
+  .banners:empty { display:none; }
+  .banner { display:flex; align-items:flex-start; gap:12px; border:1px solid; border-radius:12px; padding:14px 16px; }
+  .banner.error { background:var(--bad-bg); border-color:var(--bad-line); }
+  .banner.warn { background:var(--warn-bg); border-color:var(--warn-line); }
+  .banner svg { flex-shrink:0; margin-top:1px; }
+  .banner.error svg { color:var(--bad); } .banner.warn svg { color:var(--warn); }
+  .banner .t { font-weight:650; font-size:14px; } .banner .d { font-size:12.5px; margin-top:2px; }
+  .banner.error .t { color:var(--bad-title); } .banner.error .d { color:var(--bad-text); }
+  .banner.warn .t { color:var(--warn-title); } .banner.warn .d { color:var(--warn-text); }
+  .banner .acts { display:flex; gap:8px; flex-shrink:0; }
+  .banner.error .btn { border-color:var(--bad-line); color:var(--bad-title); background:var(--card); }
+  .banner.error .btn.primary { background:var(--bad); border:0; color:#fff; }
+  .banner.warn .btn { background:transparent; border-color:var(--warn-line); color:var(--warn-title); }
+
+  /* 行内：某个字段的问题 */
+  .ctlcol { display:flex; flex-direction:column; gap:5px; min-width:0; }
+  .err { color:var(--bad); font-size:12.5px; }
+  .input.invalid { border-color:var(--bad); box-shadow:0 0 0 3px color-mix(in srgb, var(--bad) 16%, transparent); }
+  .note { margin:4px 0 0 48px; color:var(--warn-text); font-size:12.5px; }
+
+  /* Toast：操作结果，说完就过去 */
+  .toasts { position:fixed; left:0; right:0; bottom:24px; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none; z-index:10; }
+  .toast { pointer-events:auto; display:flex; align-items:center; gap:10px; max-width:520px; background:var(--toast-bg); color:var(--toast-fg); border-radius:12px; padding:12px 16px; box-shadow:var(--toast-shadow); font-size:13.5px; animation:toast-in .18s ease-out; }
+  .toast.out { opacity:0; transform:translateY(6px); transition:opacity .18s, transform .18s; }
+  .toast svg { flex-shrink:0; } .toast.ok svg { color:var(--toast-ok); } .toast.error svg { color:var(--toast-bad); }
+  .toast .x { width:26px; height:26px; margin:-4px -6px -4px 4px; border:0; border-radius:7px; background:transparent; color:var(--toast-mut); cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; }
+  @keyframes toast-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
 
   /* 设置 */
   .form { display:flex; flex-direction:column; gap:14px; margin-top:16px; }
@@ -114,6 +144,7 @@
       <div class="sub" id="library">资源库：—</div>
     </div>
     <div class="svc">
+      <span class="chip" id="awake" hidden><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg>保持唤醒</span>
       <span class="state" id="state"><i></i><span id="stateText">未启动</span></span>
       <button type="button" class="switch lg" id="svc" role="switch" aria-checked="false" aria-label="服务开关"></button>
     </div>
@@ -126,11 +157,9 @@
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg><span id="copyText">复制</span>
     </button>
   </div>
-  <p class="line" id="status" hidden></p>
-  <p class="line" id="sleep" hidden></p>
 </section>
 
-<div id="notices" style="display:contents"></div>
+<div class="banners" id="notices"></div>
 
 <section class="card">
   <h2>设置</h2>
@@ -147,11 +176,11 @@
     </div>
     <div class="field" data-key="port">
       <label class="name" for="port">端口</label>
-      <div class="ctl"><input class="input w-port" id="port" type="number" min="1" max="65535"><span class="chg">已修改</span></div>
+      <div class="ctlcol"><div class="ctl"><input class="input w-port" id="port" type="number" min="1" max="65535" aria-describedby="err-port"><span class="chg">已修改</span></div><div class="err" id="err-port" role="alert" hidden></div></div>
     </div>
     <div class="field" data-key="user">
       <label class="name" for="user">账号</label>
-      <div class="ctl"><input class="input w-text" id="user" type="text" autocomplete="off"><span class="chg">已修改</span></div>
+      <div class="ctlcol"><div class="ctl"><input class="input w-text" id="user" type="text" autocomplete="off" aria-describedby="err-user"><span class="chg">已修改</span></div><div class="err" id="err-user" role="alert" hidden></div></div>
     </div>
     <div class="field" data-key="pass">
       <label class="name" for="pass">密码</label>
@@ -160,7 +189,7 @@
     <div class="field">
       <span class="name">选项</span>
       <div class="opts">
-        <div class="opt"><button type="button" class="switch sm" id="bonjour" role="switch" aria-checked="true" aria-label="自动发现（Bonjour）"></button><span>自动发现（Bonjour）</span></div>
+        <div><div class="opt"><button type="button" class="switch sm" id="bonjour" role="switch" aria-checked="true" aria-label="自动发现（Bonjour）"></button><span>自动发现（Bonjour）</span></div><div class="note" id="bonjourNote" hidden></div></div>
         <div class="opt"><button type="button" class="switch sm" id="nosleep" role="switch" aria-checked="true" aria-label="有连接时阻止休眠"></button><span>有连接时阻止休眠</span></div>
       </div>
     </div>
@@ -187,6 +216,8 @@
     <pre id="msglog"></pre>
   </details>
 </section>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 
 <script src="js/plugin.js"></script>
 </body>
